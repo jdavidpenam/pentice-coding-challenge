@@ -38,8 +38,9 @@ export function DevProviderSheet({ failRefresh, onFailRefresh, onRefreshNow, onC
   }
 
   return (
-    <Sheet title="Simulated provider" onClose={onClose}>
+    <Sheet title="Payment simulator" onClose={onClose}>
       <p className="users__meta">Only in dev builds. Controls how the simulated provider answers the next payment or status check.</p>
+      <Banner tone="info" glyph="i">Applies to <strong>Pay for a room</strong> only. Transfers move money between wallet accounts and never use the provider.</Banner>
       {error && <Banner tone="danger" glyph="!" role="alert">{error}</Banner>}
       <div className="users" role="radiogroup" aria-label="Provider behaviour">
         {SIMULATOR_MODES.map((m) => (

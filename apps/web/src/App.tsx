@@ -148,7 +148,7 @@ export function App() {
         }
         sideFooter={
           <>
-            {DEV && <button type="button" className="dev-btn" onClick={() => { setSheet('dev'); }}>Simulated provider (dev only)</button>}
+            {DEV && <button type="button" className="dev-btn" onClick={() => { setSheet('dev'); }}>Payment simulator (dev only)</button>}
             <p className="side-notice">{DEMO_NOTICE}</p>
             {themeButton}
           </>

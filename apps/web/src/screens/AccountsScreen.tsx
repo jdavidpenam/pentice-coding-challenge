@@ -36,7 +36,7 @@ export function AccountsScreen({ hidden, accounts, payments, onOpenAccount, onAc
       </div>
       <footer className="demo-footer">
         <p>{DEMO_NOTICE}</p>
-        {onDevPanel && <button type="button" className="dev-btn" onClick={onDevPanel}>Simulated provider (dev only)</button>}
+        {onDevPanel && <button type="button" className="dev-btn" onClick={onDevPanel}>Payment simulator (dev only)</button>}
       </footer>
     </div>
   );
