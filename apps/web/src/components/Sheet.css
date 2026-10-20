@@ -12,3 +12,4 @@
   .sheet__panel { width: 440px; border-radius: var(--radius-xl); padding: var(--space-5) var(--space-6) var(--space-6); }
   .sheet__handle { display: none; }
 }
+.sheet__panel:focus { outline: none; }

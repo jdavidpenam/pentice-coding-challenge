@@ -15,7 +15,7 @@ import { OpenAccountSheet } from './screens/OpenAccountSheet';
 import { PayScreen } from './screens/PayScreen';
 import { TransferScreen } from './screens/TransferScreen';
 import { DEMO_NOTICE, UserSheet } from './screens/UserSheet';
-import { applyTheme, type Theme } from './theme';
+import { applyTheme, followSystemTheme, type Theme } from './theme';
 
 const TITLES = { accounts: 'Accounts', transfer: 'Transfer', pay: 'Pay for a room', activity: 'Activity' } as const satisfies Record<TabId, string>;
 const DEV = import.meta.env.DEV;
@@ -99,6 +99,8 @@ export function App() {
       setCheckingPaymentId(null);
     }
   }
+
+  useEffect(() => followSystemTheme((next) => { applyTheme(next, false); setTheme(next); }), []);
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';

@@ -19,3 +19,16 @@ export function applyTheme(theme: Theme, remember: boolean): void {
   if (!remember) return;
   try { localStorage.setItem(KEY, theme); } catch { /* storage unavailable */ }
 }
+
+/** Follows live OS theme changes until the viewer picks a theme themselves. Returns an unsubscribe function. */
+export function followSystemTheme(onChange: (theme: Theme) => void): () => void {
+  if (typeof window.matchMedia !== 'function') return () => undefined;
+  const query = window.matchMedia('(prefers-color-scheme: dark)');
+  const listener = (event: MediaQueryListEvent) => {
+    if (new URLSearchParams(window.location.search).has('theme')) return;
+    try { if (localStorage.getItem(KEY)) return; } catch { /* storage unavailable */ }
+    onChange(event.matches ? 'dark' : 'light');
+  };
+  query.addEventListener('change', listener);
+  return () => { query.removeEventListener('change', listener); };
+}

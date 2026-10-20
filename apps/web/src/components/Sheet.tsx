@@ -28,7 +28,7 @@ export function Sheet({ title, onClose, locked = false, children }: Props) {
       const items = [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
       const first = items[0];
       const last = items.at(-1);
-      if (!first || !last) return;
+      if (!first || !last) { event.preventDefault(); return; }
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
@@ -39,10 +39,15 @@ export function Sheet({ title, onClose, locked = false, children }: Props) {
     };
   }, []);
 
+  // Locking disables the focused button; keep focus inside the dialog instead of letting it fall to <body>.
+  useEffect(() => {
+    if (locked && !panel.current?.contains(document.activeElement)) panel.current?.focus();
+  }, [locked]);
+
   return (
     <div className="sheet">
       <div className="sheet__scrim" onClick={() => { if (!locked) onClose(); }} aria-hidden="true" />
-      <div className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel}>
+      <div className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={panel} tabIndex={-1}>
         <div className="sheet__handle" aria-hidden="true" />
         <div className="sheet__head">
           <h2 id={titleId} className="sheet__title">{title}</h2>

@@ -119,3 +119,23 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 | RS2-2 | Info | README provider items 1 and 2 both mentioned lookup by key. | Item 1 trimmed to charge keys + retention. |
 
 **Milestone status — senior bonus: complete and reviewed.** No open Blocking/High/Medium findings. Accepted/disclosed: S-L3 (no reconcile age limit; provider retention assumption), S-L4 (new key after edits), unreachable defense-in-depth guards (claim/applyOutcome).
+
+---
+
+## R-CW — Calm wallet UI redesign review
+
+- **Snapshot:** `63a7c8f` (diff vs `0f3ff80`) · **Reviewer context:** fresh general-purpose subagent: UI-only constraint, the 9 must-haves, breakpoints/theme, wiring correctness, test effectiveness (own mutations), TIMELOG claims. Budget ≈15 min, scratch copy at /tmp/rv63; the repo was not modified.
+- **Requested:** 2026-10-19T20:58:13-05:00 (01:58:13Z) · **Returned:** by 2026-10-19T21:01:08-05:00 (02:01:08Z) (first clock capture after the report; reported duration ≈172 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — 0 Blocking/High, 1 Medium, 4 Low. All 9 must-haves met; constraint met (no changes to apps/api, api.ts, dashboard.ts, money.ts or its tests; tokens.css byte-identical; no component library).
+- **Reviewer's own checks:** `npm run check` exit 0 (API 114/114, web 60/60). Five UI mutations: M1 always-new key, M2 Transfer "Sending…" removed, M4 check results cleared on refresh, M5 Transfer loading removed: all killed; M3 Pay "Contacting provider…" + `inFlight` removed: **survived**. Headless screenshots at 375 (dark) and 1280 (light); 768 captured but not inspected in detail. TIMELOG E20/E21 arithmetic and claims consistent.
+- **Not performed by reviewer:** AA contrast measurement; interactive real-browser clicking; live provider walk-through; runtime theme toggle; pixel comparison with the prototype.
+
+| ID | Sev | Location | Finding | Resolution |
+|---|---|---|---|---|
+| CW-M1 | Medium | `PayScreen.tsx` intent ref | The Idempotency-Key for an unconfirmed payment lived in a component ref, so a user switch (remount) or reload lost it; re-paying with identical details then created a second payment despite the copy "you won't be charged twice". | Fixed: new `lib/payment-intents.ts` keeps intents outside React, keyed by acting user + exact payload, mirrored to sessionStorage (try/catch; in-memory if unavailable). New UI test: Unconfirmed → switch to Bob and back → same details → same key, dedupe note shown. **Mutation check by the implementer:** clearing intents on every Pay mount (the old behaviour) fails exactly that test (1 failed / 61). Limit: a new browser tab or session has no record, so it would start a new payment (disclosed). |
+| CW-L1 | Low (tests) | `App.test.tsx` | No test for Pay's "Contacting provider…" label or `inFlight` guard (M3 survived). | Fixed: new test with a delayed provider and a double click asserts the disabled "Contacting provider…" button and one POST. Mutant M3 now killed (1 failed / 61). |
+| CW-L2 | Low | `TransferScreen.tsx` review sheet | "{From} after" showed a negative client-computed balance when the amount exceeded available. | Fixed: the estimate row is hidden when amount > available; the server's insufficient-funds message remains the only verdict. |
+| CW-L3 | Low (a11y) | `Sheet.tsx` | When locked, the focused Send button became disabled and focus fell to `<body>`; Tab could leave the dialog. | Fixed: panel is `tabIndex=-1` and receives focus when locking if focus is outside it; Tab is swallowed when nothing inside is focusable. Not covered by an automated test. |
+| CW-L4 | Low | `theme.ts` | Theme did not follow live OS `prefers-color-scheme` changes. | Fixed: `followSystemTheme` listener applies OS changes until the viewer has a saved choice or a `?theme=` override. Not covered by an automated test (jsdom has no matchMedia; guarded). |
+
+**Post-fix verification (2026-10-19T21:03:08-05:00):** `npm run check` exit 0 — API 114/114, web 62/62, lint, typecheck, builds.

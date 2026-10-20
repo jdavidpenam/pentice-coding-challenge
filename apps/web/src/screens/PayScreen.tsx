@@ -9,6 +9,7 @@ import { STATUS, StatusBadge } from '../components/StatusBadge';
 import { validateAmount } from '../lib/amount';
 import { checkedLabel, type CheckResult } from '../lib/check';
 import { money } from '../lib/format';
+import { findIntent, forgetIntent, rememberIntent } from '../lib/payment-intents';
 import './screens.css';
 
 interface Props {
@@ -50,12 +51,6 @@ export function PayScreen({ hidden, userId, accounts, payments, checkResults, ch
   /** The server's response for the last payment; shown even if the refresh after it fails. */
   const [lastResponse, setLastResponse] = useState<Payment>();
   const [dedupedNote, setDedupedNote] = useState(false);
-  /**
-   * One Idempotency-Key per intended payment. Kept while the outcome is unconfirmed so identical details retry the
-   * SAME payment (the backend then reconciles instead of charging again); replaced when the details change or the
-   * payment is final.
-   */
-  const intent = useRef<{ key: string; payload: string; paymentId?: string } | null>(null);
   const inFlight = useRef(false);
 
   const fromAccount = accounts.find((a) => a.id === from) ?? accounts[0];
@@ -73,22 +68,25 @@ export function PayScreen({ hidden, userId, accounts, payments, checkResults, ch
     if (inFlight.current || !check.ok || reference.trim() === '' || !fromAccount) return;
     const body = { accountId: fromAccount.id, amountMinor: check.minor, reference: reference.trim() };
     const payload = JSON.stringify(body);
-    const current = intent.current?.payload === payload ? intent.current : { key: crypto.randomUUID(), payload };
-    const isRetryOfPending = current === intent.current && current.paymentId !== undefined;
-    intent.current = current;
+    // One Idempotency-Key per intended payment (per user + identical details), kept outside this component while the
+    // outcome is unconfirmed, so a retry is the SAME payment (the backend reconciles instead of charging again).
+    const existing = findIntent(userId, payload);
+    const current = existing ?? { key: crypto.randomUUID() };
+    if (!existing) rememberIntent(userId, payload, current);
 
     inFlight.current = true;
     setSending(true);
     setServerError(undefined);
     try {
       const payment = await api.pay(userId, current.key, body);
-      intent.current = isPending(payment) ? { ...current, paymentId: payment.id } : null;
-      setDedupedNote(isRetryOfPending && current.paymentId === payment.id);
+      if (isPending(payment)) rememberIntent(userId, payload, { key: current.key, paymentId: payment.id });
+      else forgetIntent(userId, payload);
+      setDedupedNote(existing?.paymentId !== undefined && existing.paymentId === payment.id);
       setLastResponse(payment);
       onChanged();
     } catch (error) {
       // A 4xx was a definitive rejection before anything happened: the next attempt is a new payment.
-      if (error instanceof ApiError && error.status >= 400 && error.status < 500) intent.current = null;
+      if (error instanceof ApiError && error.status >= 400 && error.status < 500) forgetIntent(userId, payload);
       setServerError(describeError(error));
     } finally {
       inFlight.current = false;

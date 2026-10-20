@@ -3,6 +3,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
+import { clearIntents } from './lib/payment-intents';
 
 const ALICE = '11111111-1111-4111-8111-111111111111';
 const BOB = '22222222-2222-4222-8222-222222222222';
@@ -21,7 +22,7 @@ interface Call {
 type PaymentStatus = 'SUCCEEDED' | 'FAILED' | 'UNKNOWN';
 
 /** Minimal fake of the API: just enough state to watch the UI follow the server's numbers. */
-function fakeApi(options: { paymentStatus?: PaymentStatus; transferDelayMs?: number } = {}) {
+function fakeApi(options: { paymentStatus?: PaymentStatus; transferDelayMs?: number; paymentDelayMs?: number } = {}) {
   let available = 10_000;
   let reserved = 0;
   let readsFail = false;
@@ -56,6 +57,7 @@ function fakeApi(options: { paymentStatus?: PaymentStatus; transferDelayMs?: num
       return json(201, { id: 't1', fromAccountId: ALICE_MAIN, toAccountId: BOB_MAIN, amountMinor: amount, createdAt: '2026-10-20T00:00:00.000Z' });
     }
     if (path === '/payments' && method === 'POST') {
+      if (options.paymentDelayMs) await new Promise((r) => setTimeout(r, options.paymentDelayMs));
       const known = payments.find((p) => p['key'] === headers.get('idempotency-key'));
       if (known) return json(201, known);
       const { amountMinor, reference } = body as { amountMinor: number; reference: string };
@@ -125,6 +127,7 @@ describe('Calm wallet UI', () => {
   beforeEach(() => { install(); });
   afterEach(() => {
     cleanup();
+    clearIntents();
     vi.unstubAllGlobals();
   });
 
@@ -253,6 +256,40 @@ describe('Calm wallet UI', () => {
     const posts = api.posts('/payments');
     expect(posts).toHaveLength(2);
     expect(posts[1]?.key).toBe(posts[0]?.key);
+  });
+
+  it('6: the same-details retry still reuses the key after switching user and back (Pay screen remounted)', async () => {
+    cleanup();
+    install({ paymentStatus: 'UNKNOWN' });
+    const user = await start();
+    await fillPay(user, '20');
+    await user.click(payForm().getByRole('button', { name: 'Pay $20.00' }));
+    await main().findByText(/The provider didn't reply/);
+
+    await user.click(screen.getByRole('button', { name: /Demo user: Alice/ }));
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Demo users' })).getByRole('radio', { name: /Bob/ }));
+    await user.click(await screen.findByRole('button', { name: /Demo user: Bob/ }));
+    await user.click(within(screen.getByRole('radiogroup', { name: 'Demo users' })).getByRole('radio', { name: /Alice/ }));
+    await screen.findByRole('button', { name: /Demo user: Alice/ });
+    await screen.findByRole('form', { name: 'Pay for a room' });
+
+    await fillPay(user, '20');
+    await user.click(payForm().getByRole('button', { name: 'Pay $20.00' }));
+    expect(await main().findByText('You already had this payment in progress, so we checked its status instead of charging again.')).toBeTruthy();
+    const posts = api.posts('/payments');
+    expect(posts).toHaveLength(2);
+    expect(posts[1]?.key).toBe(posts[0]?.key);
+  });
+
+  it('4: the Pay button disables and reads “Contacting provider…” in flight; a double click pays once', async () => {
+    cleanup();
+    install({ paymentDelayMs: 60 });
+    const user = await start();
+    await fillPay(user, '1');
+    await user.dblClick(payForm().getByRole('button', { name: 'Pay $1.00' }));
+    expect(payForm().getByRole('button', { name: 'Contacting provider…' })).toHaveProperty('disabled', true);
+    await main().findByText(/Paid from Main/);
+    expect(api.posts('/payments')).toHaveLength(1);
   });
 
   it('a different payment after a final result gets a new Idempotency-Key', async () => {

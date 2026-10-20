@@ -127,7 +127,10 @@ export function TransferScreen({ hidden, userId, accounts, directory, onChanged 
               <dl className="review__dl">
                 <div><dt>From</dt><dd>{fromAccount.name}</dd></div>
                 <div><dt>To</dt><dd>{toLabel}</dd></div>
-                <div><dt>{fromAccount.name} after</dt><dd>{money(fromAccount.availableMinor - phase.amountMinor)} available</dd></div>
+                {/* Estimate only; never show a negative balance when the server is about to refuse the transfer. */}
+                {phase.amountMinor <= fromAccount.availableMinor && (
+                  <div><dt>{fromAccount.name} after</dt><dd>{money(fromAccount.availableMinor - phase.amountMinor)} available</dd></div>
+                )}
               </dl>
               {phase.kind === 'review' && phase.error && (
                 <Banner tone="danger" glyph="!" role="alert"><strong>Transfer not sent</strong><br />{phase.error}</Banner>
