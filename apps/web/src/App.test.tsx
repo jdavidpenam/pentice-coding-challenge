@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
@@ -279,6 +279,22 @@ describe('Calm wallet UI', () => {
     const posts = api.posts('/payments');
     expect(posts).toHaveLength(2);
     expect(posts[1]?.key).toBe(posts[0]?.key);
+  });
+
+  it('after Check status settles an Unconfirmed payment, paying again with the same details is a new payment with a new key', async () => {
+    cleanup();
+    install({ paymentStatus: 'UNKNOWN' });
+    const user = await start();
+    await fillPay(user, '20');
+    await user.click(payForm().getByRole('button', { name: 'Pay $20.00' }));
+    await main().findByText(/The provider didn't reply/);
+    await user.click(main().getByRole('button', { name: 'Check status' }));
+    await main().findByText(/^Checked \d\d:\d\d/);
+
+    await user.click(payForm().getByRole('button', { name: 'Pay $20.00' }));
+    await waitFor(() => { expect(api.posts('/payments')).toHaveLength(2); });
+    const keys = api.posts('/payments').map((c) => c.key);
+    expect(keys[1]).not.toBe(keys[0]);
   });
 
   it('4: the Pay button disables and reads “Contacting provider…” in flight; a double click pays once', async () => {

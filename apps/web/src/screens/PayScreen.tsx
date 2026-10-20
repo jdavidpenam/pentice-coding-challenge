@@ -70,7 +70,11 @@ export function PayScreen({ hidden, userId, accounts, payments, checkResults, ch
     const payload = JSON.stringify(body);
     // One Idempotency-Key per intended payment (per user + identical details), kept outside this component while the
     // outcome is unconfirmed, so a retry is the SAME payment (the backend reconciles instead of charging again).
-    const existing = findIntent(userId, payload);
+    // If that payment has since become final (e.g. via Check status), the next Pay is a new payment with a new key.
+    const stored = findIntent(userId, payload);
+    const settled = payments.find((p) => p.id === stored?.paymentId);
+    if (stored && settled && !isPending(settled)) forgetIntent(userId, payload);
+    const existing = settled && !isPending(settled) ? undefined : stored;
     const current = existing ?? { key: crypto.randomUUID() };
     if (!existing) rememberIntent(userId, payload, current);
 
