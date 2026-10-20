@@ -144,3 +144,32 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 
 - **Snapshot:** `3615d38` (diff vs `63a7c8f`) · **Requested:** 2026-10-19T21:03:29-05:00 · **Stopped by the candidate** before reporting (noted 2026-10-19T21:04:39-05:00). No findings were received.
 - **Status:** the CW-M1 and CW-L1 to CW-L4 fixes are **not independently re-reviewed**. Evidence so far is the implementer's own: `npm run check` exit 0 (API 114/114, web 62/62) and two mutation checks (CW-M1, CW-L1).
+
+---
+
+## R-F — Final independent audit
+
+- **Snapshot:** `2e620ba` · **Reviewer context:** fresh general-purpose subagent given the repo path, the PDF, PLAN/CLAUDE/README/TIMELOG/REVIEW paths, the 14-point audit scope, the deadline and a ≈25 min budget. It worked in a `git archive` copy and did not edit the repo.
+- **Requested:** 2026-10-19T21:12:39-05:00 · **Returned:** by 2026-10-19T21:15:09-05:00 (first clock capture after the report; reported duration ≈138 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — 0 Blocking/High/Medium.
+- **Reviewer's own checks:** `npm test` (API 114/114, web 63/63), typecheck and lint clean in the copy. It did not run `build`/`check`.
+- **Not performed by reviewer:** mutation testing; running app or browser; concurrency stress beyond reading tests; full read of web components/tests, PLAN.md and REVIEW.md; commit timestamps vs TIMELOG; dependency vulnerability scan; viewing PDF pages (text extraction only).
+
+| ID | Sev | Location | Finding | Resolution |
+|---|---|---|---|---|
+| A1 | Low | `payments.service.ts` (provider-result `default:` branches) | A malformed provider result threw while the payment was PROCESSING; reconcile only acts on UNKNOWN, so funds stayed reserved with no recovery path. Unreachable with the simulator. | Fixed in `343b39d`: both branches now `markUnknown(..., 'error')`. New regression test (malformed charge → UNKNOWN/reserved; malformed lookup stays UNKNOWN; valid lookup → SUCCEEDED). Implementer mutation check: the test fails with the fix reverted. README wording corrected. |
+| A2 | Low | `payments.controller.ts` | Bad body or missing `Idempotency-Key` without identity gives 400, not 401. No state change. | Documented earlier (body validation precedes identity); no change. |
+| A3 | Info | transfers | A transfer to an existing vs nonexistent destination differs (accepted vs 404), so account-ID existence can be probed. Inherent to sending to another user's account. | Accepted; IDs are random UUIDs listed in the demo directory. |
+| B-prefs | Info | various | Simulator is deterministic by mode (not random); manual-only reconciliation; `MaxListenersExceededWarning` noise in tests; E04 plan review was short (~1.5 min). | Disclosed; no change. |
+
+### R-F2 — Focused re-review of A1 fix
+
+- **Snapshot:** `343b39d` (diff vs `2e620ba`) · **Requested:** 2026-10-19T21:15:56-05:00 · **Returned:** by 2026-10-19T21:16:32-05:00 (first clock capture after the report; reported duration ≈30 s).
+- **Verdict:** **PASS** (Info only). Reviewer ran API tests in a copy (115/115) and confirmed the new test fails with the `throw` defaults restored; confirmed no ledger write on the new path, no double capture/release, `never` exhaustiveness kept, no loop on not_found → charge → malformed.
+- **Info findings:** the error log printed the raw malformed provider payload (against the "log IDs/amounts/outcomes, not bodies" rule). **Resolved after the re-review** by logging only `paymentId`, operation and the status string. That last log-line change is **not independently re-reviewed**; `npm run check` exit 0 after it (API 115/115, web 63/63).
+- **Not performed by reviewer:** lint/build, web tests, a concurrent-reconcile race with a malformed provider, review beyond the diff.
+
+### Unresolved / not independently reviewed (final state)
+
+- R-CW fixes (`3615d38`), the key-after-settle fix (`d61d9bd`) and the simulator-copy change (`5d6df43`) were never independently reviewed (R-CW2 was stopped). The R-F audit read the code at `2e620ba` that includes them but only skimmed the web app.
+- The README, matrix and demo script added in the final prep were written after the audit snapshot and were not reviewed.

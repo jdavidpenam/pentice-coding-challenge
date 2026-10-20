@@ -145,7 +145,7 @@ export class PaymentsService {
       default: {
         // A malformed provider answer is not a definitive one: keep the funds reserved and stay reconcilable.
         const unhandled: never = lookup;
-        this.logger.error(`Unhandled lookup result: ${JSON.stringify(unhandled)}`);
+        this.logger.error(JSON.stringify({ event: 'payment.malformed_provider_result', paymentId, operation: 'lookup', status: String((unhandled as { status?: unknown }).status) }));
         return this.markUnknown(paymentId, { operation: 'lookup', result: 'error' });
       }
     }
@@ -195,7 +195,7 @@ export class PaymentsService {
       default: {
         // A malformed provider answer is not a definitive one: keep the funds reserved and stay reconcilable.
         const unhandled: never = outcome;
-        this.logger.error(`Unhandled provider outcome: ${JSON.stringify(unhandled)}`);
+        this.logger.error(JSON.stringify({ event: 'payment.malformed_provider_result', paymentId, operation, status: String((unhandled as { status?: unknown }).status) }));
         return this.markUnknown(paymentId, { operation, result: 'error' });
       }
     }

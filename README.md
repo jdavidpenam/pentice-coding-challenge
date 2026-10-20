@@ -38,6 +38,13 @@ API environment variables:
 | `SEED_DEMO_DATA` | on | Set to `false` to start with no users |
 | `PROVIDER_TIMEOUT_MS` | `3000` | How long to wait for one provider call before treating its outcome as unknown |
 
+## Demo users, currency and funding
+
+- **Currency:** USD only; amounts are integer cents.
+- **Seeded users** (startup seed, `apps/api/src/seed.ts`; set `SEED_DEMO_DATA=false` to skip): **Alice** (Main $1,250.00, Savings $300.00), **Bob** (Main $480.00), **Carol** (Main $0.00).
+- **Funding:** there is no deposit endpoint. The only money source is the seed. A user you add starts at $0.00 and can only receive transfers.
+- **Acting identity:** the UI's "Acting as" selector sets the `X-Demo-User-Id` header. This is a demo identity, **not authentication**.
+
 ## What it does
 
 | Feature | API | UI |
@@ -55,6 +62,30 @@ API environment variables:
 | Simulator scenario for new charges: approve, decline, timeout before charge, charge then lost response (dev only) | `GET /api/dev/provider`, `POST /api/dev/provider/mode` | "Simulated provider (dev only)" |
 
 Every endpoint except `/users` and `/dev/*` needs the `X-Demo-User-Id` header.
+
+## Requirement matrix
+
+IDs are from `PLAN.md` (R = brief requirement, B = bonus, AC = acceptance criterion). "Evidence" names automated tests unless stated; "implementer-run" means I ran it, and the independent reviewers' own runs are in `REVIEW.md`.
+
+| ID | Status | Evidence | Limitations |
+|---|---|---|---|
+| R1 Add a user | Done | `users-accounts.e2e.test.ts`; UI "Add user"; demo step 1 | Unauthenticated, no rate limit (cap 1,000 users) |
+| R2 One or more accounts | Done | `users-accounts.e2e.test.ts`; `POST /api/accounts`; demo step 1 | Max 10 accounts per user |
+| R3 Transfer between own accounts | Done | `transfers.e2e.test.ts`; demo 2a | No transfer idempotency key |
+| R4 Transfer to other users | Done | `transfers.e2e.test.ts`; demo 2b | Recipient identified by account ID from the directory |
+| R5 Correct money movement | Done | Invariant checks after every transfer/payment test (buckets = ledger sums, total conserved); rejected-request snapshot tests | In-memory only |
+| R6 Payment via simulated provider | Done | `payments.e2e.test.ts`; demo 5 | Stub only; no card/bank data |
+| R7 Pay only with enough balance | Done | `payments.e2e.test.ts` (insufficient funds → 422, no state change) | |
+| R8 Provider boundary | Done | `PaymentProvider` DI token; AC12 tests run the flow against other provider implementations | Real adapter must meet the contract below |
+| R9 Documented decisions | Done | This README, `PLAN.md` (+ amendments), `REVIEW.md` | |
+| R10 Simple UI | Done (a redesigned "Calm wallet" UI) | Web tests (Testing Library); manual headless-Chrome checks | Real-browser click-through not automated |
+| R11 In-memory state | Done | `Store` | Lost on restart |
+| R12 Honest time-boxing | See "Timing" | `TIMELOG.md` (self-reported) | Not independent proof |
+| B1 Timeouts / charge-then-fail | Done | Four deterministic simulator modes; `payment-safety.e2e.test.ts` | Deterministic by mode, not random |
+| B2 Retry without double charge | Done | Idempotency-Key tests: same key → one reservation, one provider charge; 409 on mismatch | In-memory keys only |
+| B3 Resolve unknown outcome | Done | Reconcile tests (succeeded → capture, declined → release, pending stays UNKNOWN, not_found → re-charge with same key) | Manual trigger only; no background reconciler |
+| B4 Concurrent transfers | Done | `payment-safety.e2e.test.ts` (25 concurrent transfers cannot overspend; crossing transfers conserve funds; concurrent reconciles → one capture) | Guarantee is single-process |
+| AC21–AC23 (A1 amendments) | Done | Compare-and-set settle, reservation-with-key atomicity tests | |
 
 ## Money rules
 
@@ -161,7 +192,23 @@ Then change one binding in `apps/api/src/app.module.ts`:
 { provide: PAYMENT_PROVIDER, useClass: RealProviderAdapter }
 ```
 
-The service, controller, and ledger don't change. A test (AC12) runs the payment flow against a different provider implementation to show this. A real adapter should also validate the provider's response shape. An unexpected shape currently ends in a 500 with the payment left unresolved and its funds reserved, which is safe but unhelpful.
+The service, controller, and ledger don't change. A test (AC12) runs the payment flow against a different provider implementation to show this. A real adapter should also validate the provider's response shape at runtime (the contract is a TypeScript type only). An unrecognised answer is treated as *not definitive*: the payment becomes `UNKNOWN`, its funds stay reserved, and it can be reconciled later (regression-tested).
+
+## Demo sequence
+
+With the API running with dev tools on (`npm run dev`), run `scripts/demo.sh` (needs `curl` and `jq`; `BASE=http://127.0.0.1:3000/api` by default). It uses the seeded users and walks through:
+
+1. **Create a user and accounts** — adds *Dana* (gets a $0 Main account) and opens a second account.
+2. **Transfers** — Alice Main → Alice Savings ($10.00) and Alice → Bob ($25.00).
+3. **Insufficient funds** — Dana (empty) → Bob: 422 `INSUFFICIENT_FUNDS`, no change.
+4. **Unauthorized debit** — acting as Bob, debit Alice's account: 404 (same as a nonexistent account), and Alice's balances are unchanged.
+5. **Simulated payment** — mode `approve`, pay $40.00: `SUCCEEDED`.
+6. **Charge-then-timeout** — mode `charge_then_timeout`, pay $50.00: `UNKNOWN` with $50.00 reserved. Retry with the same `Idempotency-Key` resolves it via lookup to `SUCCEEDED` with one provider charge. Same key with a different amount: 409. Reconcile again: unchanged (idempotent).
+7. **Concurrency** — run `npm test -w apps/api` (see `payment-safety.e2e.test.ts`: 25 simultaneous transfers cannot overspend; concurrent reconciles produce one lookup and one capture).
+
+In the UI: pick **Alice**, open the dev "Payment simulator" and choose a scenario, then Pay for a room. The simulator applies to payments only; transfers never call the provider.
+
+I ran this script once against a throwaway API instance on a spare port, and the outputs matched the descriptions above (balances 112,500 / 31,000 cents after the sequence for Alice, nothing reserved). This is a manual run, not an automated test.
 
 ## Security: implemented protections
 
@@ -193,6 +240,33 @@ The service, controller, and ledger don't change. A test (AC12) runs the payment
 ## Deferred production requirements
 
 Real authentication and sessions; a persistent database with transactions; a durable idempotency store; a background reconciler and outbox; provider webhooks with signature verification; an append-only audit log; rate limiting; idempotency keys on transfers; operator tooling for stuck payments; multi-currency; KYC/AML, fraud checks and limits; TLS, secrets management and observability; refunds and chargebacks.
+
+## Deliberately omitted scope
+
+No database, real authentication, funding/deposit endpoint, refunds, multi-currency, webhooks, background reconciler, operator tooling, rate limiting, or transfer idempotency. No real provider, card or bank data. See "Deferred production requirements".
+
+## How AI and the independent reviewer were used
+
+- **Implementation:** the code, tests and docs were written by Claude Code (Anthropic's CLI agent) working from my instructions and the PDF brief. I directed scope, accepted or rejected changes, and reported bugs from manual testing (for example the table layout and the simulator behaviour). AI output was checked by running the tests, typecheck, lint and build, and by targeted mutation checks (remove a fix, confirm a test fails). Some of those checks are the implementer's own; the log says which.
+- **Independent reviews:** at each milestone a separate, fresh-context Claude subagent reviewed a Git snapshot and reported findings, which are appended in `REVIEW.md` with the fixes and which fixes were *not* independently re-reviewed. The reviewers are the same model family as the implementer, so they are a second look, not a human or external audit. Reviewers did not edit code.
+- Reviews were never used to weaken a requirement or a test.
+
+## Verification status
+
+Run by me under Node 24.22.0 on macOS at 2026-10-19 ≈21:17 (-05:00), on the code of the final commit apart from docs:
+
+- `npm run check` (typecheck, lint, tests, build): **exit 0**. API tests 115/115, web tests 63/63.
+- `npm install` was **not** re-run from a clean checkout and `node_modules` was not deleted, to avoid risk near the deadline; dependencies come from `package-lock.json`.
+- `scripts/demo.sh` was run once manually (see Demo sequence).
+- **Not performed:** a real-browser click-through of the final UI, a dependency vulnerability scan, accessibility contrast measurement, and load testing.
+- **Independent reviews** (`REVIEW.md`): plan, backend, frontend, bonus, UI redesign and the final audit all returned PASS or PASS WITH LIMITATIONS with no Blocking/High findings. **Not independently reviewed:** the R-CW fixes, the later key-after-settle and simulator-copy fixes, the last log-line change, and the final README/matrix/demo script. Reviewers are AI subagents of the same model family.
+
+## Timing
+
+- **Start:** 2026-10-19T19:11:46-05:00 (00:11:46Z). **Deadline:** 23:11:46-05:00.
+- The final-prep work began at 21:12:34 (2:00:48 elapsed) and finished at roughly 2:10 elapsed, i.e. **well inside the four hours**. The exact handoff timestamp is in the last row of `TIMELOG.md`.
+- **Gaps:** several stretches were my own manual testing/design time between prompts (for example 20:06–20:47), logged as such. Two phases have no separate start/end captures (E03, E07). No overrun.
+- `TIMELOG.md` is self-reported. Git commit timestamps were not altered but are not independent proof either.
 
 ## Stack
 
