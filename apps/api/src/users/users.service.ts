@@ -2,8 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { AccountsService } from '../accounts/accounts.service.js';
 import { nowIso } from '../common/clock.js';
+import { DomainError } from '../common/errors.js';
 import { InMemoryStore } from '../store/in-memory-store.js';
 import type { Account, User } from '../store/models.js';
+
+/** Bounds in-memory growth: user creation needs no identity, so anyone can call it. */
+export const MAX_USERS = 1_000;
 
 export interface PublicUser {
   readonly id: string;
@@ -28,6 +32,9 @@ export class UsersService {
 
   /** Creates a user with one empty account. New users are funded only by receiving transfers. */
   create(name: string): { user: PublicUser; account: Account } {
+    if (this.store.users.size >= MAX_USERS) {
+      throw new DomainError('USER_LIMIT_REACHED', 'The demo has reached its user limit.');
+    }
     const user: User = { id: randomUUID(), name, createdAt: nowIso() };
     this.store.users.set(user.id, user);
     const account = this.accounts.open(user, 'Main');

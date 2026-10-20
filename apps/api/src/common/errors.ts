@@ -5,7 +5,8 @@ export type DomainErrorCode =
   | 'SAME_ACCOUNT'
   | 'INSUFFICIENT_FUNDS'
   | 'BALANCE_LIMIT_EXCEEDED'
-  | 'ACCOUNT_LIMIT_REACHED';
+  | 'ACCOUNT_LIMIT_REACHED'
+  | 'USER_LIMIT_REACHED';
 
 export interface ErrorDetail {
   readonly path: string;
@@ -36,6 +37,7 @@ export function httpStatusFor(code: DomainErrorCode): number {
     case 'INSUFFICIENT_FUNDS':
     case 'BALANCE_LIMIT_EXCEEDED':
     case 'ACCOUNT_LIMIT_REACHED':
+    case 'USER_LIMIT_REACHED':
       return 422;
     default: {
       const unhandled: never = code;

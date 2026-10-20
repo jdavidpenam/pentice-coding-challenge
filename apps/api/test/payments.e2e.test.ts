@@ -73,6 +73,15 @@ describe('payments through the simulated provider', () => {
     expect(t.balance(alice.mainAccountId)).toBe(9_300);
   });
 
+  it('AC12: a definitive decline from a different provider also releases the hold', async () => {
+    const decliner: PaymentProvider = { charge: () => Promise.resolve({ status: 'declined', reason: 'Insufficient limit.' }) };
+    t = await createTestApp({ provider: decliner });
+    const alice = await t.createUser('Alice', 10_000);
+    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 700, reference: 'Room 3' }).expect(201);
+    expect(res.body).toMatchObject({ status: 'FAILED', failureReason: 'Insufficient limit.' });
+    expect(t.balance(alice.mainAccountId)).toBe(10_000);
+  });
+
   it('provider error (unknown outcome) keeps the payment PENDING with funds held — never released or guessed', async () => {
     const failing: PaymentProvider = { charge: () => Promise.reject(new Error('socket hang up at internal.host:443')) };
     t = await createTestApp({ provider: failing });

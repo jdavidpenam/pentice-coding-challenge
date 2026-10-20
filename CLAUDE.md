@@ -2,11 +2,12 @@
 
 Assessment project (Pentice "Transactions App"). Source of truth: `/Users/juanpena/Downloads/02 - Challenge Type 1 - Transactions App.pdf`. Plan: `PLAN.md`. Timing: `TIMELOG.md`. Reviews: `REVIEW.md`.
 
-## Commands (planned; update once scaffolded)
+## Commands
 - `nvm use` (Node 24 LTS, see `.nvmrc`)
 - `npm install`
 - `npm run dev` — API on http://127.0.0.1:3000, web on http://localhost:5173
-- `npm test` — all tests (API e2e + unit, web unit)
+- `npm test` — all tests (API e2e + unit, web unit + Testing Library)
+- `npm run lint` · `npm run build` · `npm run check` (typecheck, lint, test, build)
 - `npm run typecheck`
 
 ## Timing rules

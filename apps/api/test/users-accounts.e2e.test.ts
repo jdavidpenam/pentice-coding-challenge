@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { MAX_USERS } from '../src/users/users.service.js';
 import { createTestApp, expectSafeError, HEADER, type TestApp } from './helpers.js';
 
 describe('users and accounts', () => {
@@ -101,6 +102,33 @@ describe('users and accounts', () => {
     const req = t.http().get('/api/accounts');
     const res = await (header === undefined ? req : req.set(HEADER, header));
     expectSafeError(res, 401, 'DEMO_USER_REQUIRED');
+  });
+
+  it('caps the total number of users', async () => {
+    for (let i = 0; i < MAX_USERS; i += 1) t.store.users.set(`u${i}`, { id: `u${i}`, name: 'x', createdAt: '' });
+    const res = await t.http().post('/api/users').send({ name: 'Late' });
+    expectSafeError(res, 422, 'USER_LIMIT_REACHED');
+    expect(t.store.users.size).toBe(MAX_USERS);
+  });
+
+  // Body validation (pipes) runs before identity resolution, so POSTs send a valid body to reach the identity check.
+  it.each([
+    ['GET', '/api/accounts', undefined],
+    ['POST', '/api/accounts', { name: 'X' }],
+    ['GET', `/api/accounts/${randomUUID()}`, undefined],
+    ['GET', `/api/accounts/${randomUUID()}/transactions`, undefined],
+    ['GET', '/api/directory', undefined],
+    ['GET', '/api/transfers', undefined],
+    ['POST', '/api/transfers', { fromAccountId: randomUUID(), toAccountId: randomUUID(), amountMinor: 1 }],
+    ['GET', '/api/payments', undefined],
+    ['POST', '/api/payments', { accountId: randomUUID(), amountMinor: 1, reference: 'R1' }],
+    ['GET', `/api/payments/${randomUUID()}`, undefined],
+  ] as const)('every acting-user endpoint rejects an unknown demo identity: %s %s', async (method, path, body) => {
+    const before = t.snapshot();
+    const req = method === 'GET' ? t.http().get(path) : t.http().post(path).send(body);
+    const res = await req.set(HEADER, randomUUID());
+    expectSafeError(res, 401, 'DEMO_USER_REQUIRED');
+    expect(t.snapshot()).toEqual(before);
   });
 
   it('rejects malformed route IDs', async () => {

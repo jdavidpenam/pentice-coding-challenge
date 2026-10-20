@@ -347,3 +347,8 @@ Requirements are unchanged; these amendments tighten the design and add acceptan
 - **A1.8 (L4)** Transfers have no idempotency key: a client retry after a network error could transfer twice. The brief doesn't require it. Added as **[OPT] extra #1** (same `Idempotency-Key` mechanism) if time allows, and under §11 otherwise.
 - **A1.9 (L5) M1 fallback.** If Vitest + `unplugin-swc` decorator metadata isn't working by 0:45 elapsed, run API e2e tests against `tsc`-compiled output (or use explicit `@Inject()` tokens so DI doesn't depend on emitted metadata).
 - **§11 additions:** operator tooling for stuck `UNKNOWN` payments with alerting; idempotency keys on transfers.
+
+### A2 — written by 2026-10-19T19:31-05:00 (00:31Z) · Resolve milestone A review (REVIEW.md R-A)
+- **A2.1 (F1)** The 401 error code for a missing, malformed, or unknown demo-user header is `DEMO_USER_REQUIRED` (A1.7 said `UNKNOWN_USER`). Behavior is unchanged; only the name.
+- **A2.2 (F3)** Global cap of 1,000 users (`USER_LIMIT_REACHED`, 422) to bound in-memory growth from the unauthenticated `POST /users`.
+- **A2.3 (F2)** Credits from transfers are capped at `MAX_BALANCE_MINOR`; releases of held payment funds are deliberately exempt (returning money must not fail). Documented in the README.

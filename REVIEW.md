@@ -29,3 +29,23 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 **Checks not performed by reviewer (as reported):** Node 24.22.0 LTS status on nodejs.org; @swc/core, rxjs, and reflect-metadata versions and peers; any build (none exists yet). *Implementer note:* Node 24.22.0 "Krypton" LTS was checked against nodejs.org/dist/index.json during planning (TIMELOG E02).
 
 **Re-review:** the amendments are documentation-only and map one-to-one to the findings. A focused re-check of A1 will be done together with the M1 scaffolding review rather than as a separate loop.
+
+---
+
+## R-A — Milestone A (backend core) review
+
+- **Snapshot:** `260bacd` · **Reviewer context:** fresh general-purpose subagent (only responsibilities, repo path, doc paths, scope, SHA, deadline, ≈12 min budget). It reviewed a `git archive` extract of the snapshot; no repo files were modified.
+- **Requested:** 2026-10-19T19:28:22-05:00 (00:28:22Z) · **Returned:** by 2026-10-19T19:30:53-05:00 (00:30:53Z) (first clock capture after the report; reported duration ≈ 106 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — 0 Blocking/High/Medium, 6 Low.
+- **IDs checked:** R1–R8, R11 (R9/R10/R12 partially: docs/UI/process), AC1–AC13, S1–S13, A1.1, A1.6, A1.7.
+- **Reviewer's own checks:** typecheck pass; eslint exit 0; tests 70/70; nest build exit 0. Three mutations of its own (transfers list unscoped, directory leaking balances, releasing on provider throw) were each caught by a failing test. TIMELOG E01–E07 elapsed math consistent.
+- **Not performed by reviewer:** live curl, reading the PDF directly, line-by-line review of every test file, dependency audit.
+
+| ID | Sev | Location | Finding | Resolution |
+|---|---|---|---|---|
+| F1 | Low | PLAN A1.7 vs `common/acting-user.ts` | Plan names the 401 code `UNKNOWN_USER`; the code uses `DEMO_USER_REQUIRED`. | PLAN amendment A2.1 records the real code name (append-only). |
+| F2 | Low | `ledger.service.ts` release | A release may take a balance above `MAX_BALANCE_MINOR` (still a safe integer); this is intentional. | Documented in README (money rules). |
+| F3 | Low | `POST /users` | Unbounded user creation means memory exhaustion is possible. | Fixed: global `MAX_USERS` cap → 422 `USER_LIMIT_REACHED`, plus a test. |
+| F4 | Low | `payments.service.ts` provider error | 201 + `PENDING` with funds held could be misread as paid. | UI shows "provider did not confirm… funds are held"; README states it. Resolution itself is bonus scope. |
+| F5 | Low | `payments.service.ts` settle default | A malformed real-adapter outcome → 500, payment stays PENDING (safe, untested). | Deferred: adapter-side validation noted in README for real providers. |
+| F6 | Low | tests | 401 tested on one endpoint only; decline against the alternative provider untested; third-party view of `GET /transfers` only indirect. | Fixed: `it.each` 401 test over every acting-user endpoint; alternative provider decline test. (Third-party transfers view is already asserted in the AC5 test via Carol.) S12 log content is not tested (disclosed). |
