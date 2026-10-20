@@ -30,11 +30,13 @@ export function Accounts({ userId, accounts, onChanged }: Props) {
       {accounts.length === 0 ? (
         <p>No accounts yet.</p>
       ) : (
-        <table>
+        <div className="scroll">
+        <table className="accounts">
+          <caption className="hint">Amounts in USD. Reserved = held for payments not yet confirmed.</caption>
           <thead>
             <tr>
               <th scope="col">Account</th>
-              <th scope="col" className="num">Available (USD)</th>
+              <th scope="col" className="num">Available</th>
               <th scope="col" className="num">Reserved</th>
             </tr>
           </thead>
@@ -48,6 +50,7 @@ export function Accounts({ userId, accounts, onChanged }: Props) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <form onSubmit={open} className="row">
         <label>

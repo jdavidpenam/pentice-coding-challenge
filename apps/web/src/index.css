@@ -37,6 +37,8 @@ h3 { margin: 16px 0 8px; font-size: 1rem; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 0 0 16px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; }
 .grid .card { margin: 0; }
+/* Grid items default to min-width:auto, which lets wide content push a card past its column. */
+.grid > * { min-width: 0; }
 .wide { grid-column: 1 / -1; }
 .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
 .stack { display: grid; gap: 12px; }
@@ -54,6 +56,10 @@ input[aria-invalid='true'] { border-color: var(--bad); }
 .hint { margin: -4px 0 12px; opacity: 0.8; font-size: 0.9rem; }
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { white-space: normal; vertical-align: bottom; }
+caption { caption-side: bottom; text-align: left; padding-top: 6px; margin: 0; }
+.accounts td:first-child { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 480px) { th, td { padding: 6px 4px; } }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 .out { color: var(--bad); }
 .in { color: var(--ok); }

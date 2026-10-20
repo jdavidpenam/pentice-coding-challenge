@@ -142,7 +142,7 @@ One strategy everywhere: **every check-and-mutate of money or payment state is a
 ### What a real provider must support
 
 We don't assume every provider does all of this; it's a selection criterion:
-1. **Idempotency keys on charge and lookup by key, retained for longer than any payment can stay `UNKNOWN`.** This is an assumption, not enforced: reconciliation has no age limit, so if a provider expired a key and its record, a late "Check status" that gets `not_found` would re-charge. A production version would stop auto-re-charging after the provider's retention window and hand the payment to an operator.
+1. **Idempotency keys on charge, with records retained for longer than any payment can stay `UNKNOWN`.** This is an assumption, not enforced: reconciliation has no age limit, so if a provider expired a key and its record, a late "Check status" that gets `not_found` would re-charge. A production version would stop auto-re-charging after the provider's retention window and hand the payment to an operator.
 2. **Lookup by our key**, because after a lost response we never learn their charge ID.
 3. **Definitive declines**: a decline means nothing was or will be charged for that key.
 4. **Clear timeouts and errors** that the adapter can turn into "unknown" (throw).
@@ -184,7 +184,7 @@ The service, controller, and ledger don't change. A test (AC12) runs the payment
 - **No authentication.** The `X-Demo-User-Id` header can be forged, and user IDs are listed publicly for the selector. Ownership checks are correct *given* an identity; they don't prove the caller owns it. Replace `ActingUserResolver` with verified auth to fix this.
 - **Unauthenticated user creation**, with no rate limiting (only a total cap).
 - **In-memory, mutable state.** It's lost on restart and is not a tamper-proof audit trail.
-- **Editing the payment form after an unconfirmed result starts a new payment** (new key). The first payment's funds stay reserved, so this can't overspend, but the UI doesn't warn about it.
+- **Editing the payment form after an unconfirmed result starts a new payment** (new key), even if the fields are later changed back; the unconfirmed one is still resolved with "Check status". The first payment's funds stay reserved, so this can't overspend, but the UI doesn't warn about it.
 - **Unconfirmed payments stay `UNKNOWN`** (funds reserved) until someone presses "Check status" or retries. There's no background reconciler and no operator tooling.
 - **Single process, in memory:** no crash recovery, durable idempotency or multi-instance safety (see Concurrency).
 - **Transfers have no idempotency key.** The UI's double-submit guard only stops repeated clicks in that browser tab, so a retried transfer *request* would run twice. Payments are protected server-side by `Idempotency-Key`.

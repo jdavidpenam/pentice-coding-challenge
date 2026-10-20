@@ -105,3 +105,17 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 | S-L4 | Low (UX) | `PaymentForm.tsx` | Editing the form after an UNKNOWN result starts a new payment (new key) without a warning; no overspend possible. | Accepted as deliberate "new intent"; disclosed in README limitations. |
 
 **Post-fix verification (2026-10-19T19:58:46-05:00):** `npm run check` exit 0 — API 114/114, web 37/37, lint, typecheck, builds.
+
+### R-S2 — Focused re-review of the R-S fixes
+
+- **Snapshot:** `82d18d4` (diff vs `e62bded`: tests and docs only, no source changes) · **Reviewer context:** fresh general-purpose subagent, limited to rows S-L1 to S-L4, budget ≈7 min, scratch copy.
+- **Requested:** 2026-10-19T19:59:12-05:00 (00:59:12Z) · **Returned:** by 2026-10-19T20:00:28-05:00 (2026-10-20T01:00:28Z).
+- **Verdict:** **PASS.** The S-L1 mutant (cap ignoring reserved) is killed by exactly the new test. The S-L2 mutants are killed in three variants (microtask `await` before the key write, before the replay lookup, and before the reservation). README S-L3/S-L4 disclosures are accurate and not overclaiming. `npm run check` exit 0 (API 114/114, web 37/37).
+- **Not performed:** manual UI walk-through of the S-L4 flow; anything outside S-L1 to S-L4.
+
+| ID | Sev | Finding | Resolution |
+|---|---|---|---|
+| RS2-1 | Info | S-L4: editing the form back to its original values still uses a new key. | README limitation reworded to say so. |
+| RS2-2 | Info | README provider items 1 and 2 both mentioned lookup by key. | Item 1 trimmed to charge keys + retention. |
+
+**Milestone status — senior bonus: complete and reviewed.** No open Blocking/High/Medium findings. Accepted/disclosed: S-L3 (no reconcile age limit; provider retention assumption), S-L4 (new key after edits), unreachable defense-in-depth guards (claim/applyOutcome).
