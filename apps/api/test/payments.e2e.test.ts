@@ -100,6 +100,30 @@ describe('payments through the simulated provider (core behaviour)', () => {
     expect(t.reserved(alice.mainAccountId)).toBe(2_000);
   });
 
+  it('a malformed provider answer leaves the payment UNKNOWN and reserved, and a later reconcile can settle it', async () => {
+    let lookups = 0;
+    const malformed: PaymentProvider = {
+      charge: () => Promise.resolve({ status: 'weird' } as unknown as ProviderOutcome),
+      lookup: () => {
+        lookups += 1;
+        return Promise.resolve(lookups === 1 ? ({ status: 'weird' } as never) : { status: 'succeeded', providerChargeId: 'other_9' });
+      },
+    };
+    t = await createTestApp({ provider: malformed });
+    const alice = await t.createUser('Alice', 10_000);
+    const created = (await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 2_000, reference: 'Room 5' }).expect(201)).body as Payment;
+    expect(created.status).toBe('UNKNOWN');
+    expect(t.reserved(alice.mainAccountId)).toBe(2_000);
+
+    const first = (await t.http().post(`/api/payments/${created.id}/reconcile`).set(HEADER, alice.id).expect(200)).body as Payment;
+    expect(first.status).toBe('UNKNOWN');
+    expect(t.reserved(alice.mainAccountId)).toBe(2_000);
+    const second = (await t.http().post(`/api/payments/${created.id}/reconcile`).set(HEADER, alice.id).expect(200)).body as Payment;
+    expect(second.status).toBe('SUCCEEDED');
+    expect(t.balance(alice.mainAccountId)).toBe(8_000);
+    expect(t.reserved(alice.mainAccountId)).toBe(0);
+  });
+
   it('AC13: cannot pay from, read, or list another user’s account or payments', async () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);

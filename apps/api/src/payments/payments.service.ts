@@ -143,8 +143,10 @@ export class PaymentsService {
         this.appendAttempt(paymentId, { operation: 'lookup', result: 'not_found' });
         return this.chargeAndSettle(paymentId);
       default: {
+        // A malformed provider answer is not a definitive one: keep the funds reserved and stay reconcilable.
         const unhandled: never = lookup;
-        throw new Error(`Unhandled lookup result: ${JSON.stringify(unhandled)}`);
+        this.logger.error(`Unhandled lookup result: ${JSON.stringify(unhandled)}`);
+        return this.markUnknown(paymentId, { operation: 'lookup', result: 'error' });
       }
     }
   }
@@ -191,8 +193,10 @@ export class PaymentsService {
         next = { ...base, attempts, updatedAt: at, status: 'FAILED', failureReason: outcome.reason };
         break;
       default: {
+        // A malformed provider answer is not a definitive one: keep the funds reserved and stay reconcilable.
         const unhandled: never = outcome;
-        throw new Error(`Unhandled provider outcome: ${JSON.stringify(unhandled)}`);
+        this.logger.error(`Unhandled provider outcome: ${JSON.stringify(unhandled)}`);
+        return this.markUnknown(paymentId, { operation, result: 'error' });
       }
     }
     this.store.payments.set(paymentId, next);
