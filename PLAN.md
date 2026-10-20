@@ -352,3 +352,58 @@ Requirements are unchanged; these amendments tighten the design and add acceptan
 - **A2.1 (F1)** The 401 error code for a missing, malformed, or unknown demo-user header is `DEMO_USER_REQUIRED` (A1.7 said `UNKNOWN_USER`). Behavior is unchanged; only the name.
 - **A2.2 (F3)** Global cap of 1,000 users (`USER_LIMIT_REACHED`, 422) to bound in-memory growth from the unauthenticated `POST /users`.
 - **A2.3 (F2)** Credits from transfers are capped at `MAX_BALANCE_MINOR`; releases of held payment funds are deliberately exempt (returning money must not fail). Documented in the README.
+
+### A3 — written by 2026-10-19T19:46:25-05:00 · Senior bonus design (B1–B4)
+Baseline §6.3–6.4 and A1 still apply. This amendment makes them concrete and changes four things, each with its reason: (a) reserved funds are now a separate bucket, not a debit, because the bonus prompt requires available and reserved funds to be clearly distinguished; (b) statuses are renamed and `UNKNOWN` is added; (c) a key reused with a different payload returns 409, not the baseline's 422, because it is a conflict with an existing resource, not a validation error; (d) the Idempotency-Key format is `[A-Za-z0-9_-]{8,100}`, not only UUID, to fit other client key generators. The web app sends a UUID.
+
+**A3.1 Failure scenarios to defend against**
+1. *Charge then lost response.* The provider charged, but its answer times out or errors. If we treated that as failure and released the funds, the user keeps the money *and* the merchant is paid, which creates money. → Must stay reserved as `UNKNOWN`.
+2. *Timeout before charge.* The provider never charged. If we kept it `UNKNOWN` forever, the funds would be stuck. → Reconcile: lookup says `not_found` → re-send the charge with the **same** provider key → definitive result.
+3. *Client retry after a network error.* The user clicks Pay again. Without idempotency we'd get a second reservation and a second charge. → `Idempotency-Key` per user + operation, bound to the payload.
+4. *Two identical requests at the same time* (double click, proxy retry). → Key lookup, reservation, and payment creation happen in one synchronous step before any `await`; the second request finds the first.
+5. *Two reconciles at once, or a reconcile during the original call.* → They could double capture or double release. Single-flight: only a `UNKNOWN → PROCESSING` compare-and-set may start provider work; everyone else gets the current state.
+6. *A transfer during an in-flight payment.* → Reserved funds are not available; the transfer sees only `availableMinor`.
+7. *Concurrent transfers on one account.* → Each transfer is one synchronous check-and-write (no `await`), so they serialize.
+8. *Not-found treated as never-charged.* A slow in-flight charge could still land. → `not_found` never marks a payment FAILED; we re-charge with the same key, so the provider dedupes.
+
+**A3.2 Account buckets**
+`availableMinor` (spendable) and `reservedMinor` (held for unresolved payments). Ledger entries carry both deltas:
+
+| Entry | available | reserved |
+|---|---|---|
+| SEED, TRANSFER_IN | +X | |
+| TRANSFER_OUT | −X | |
+| PAYMENT_RESERVE | −X | +X |
+| PAYMENT_RELEASE (definitive failure) | +X | −X |
+| PAYMENT_CAPTURE (confirmed success; money leaves) | | −X |
+
+Invariants (tested): each bucket = Σ of its deltas, both ≥ 0, and `reservedMinor` = Σ amounts of that account's payments in `PROCESSING`/`UNKNOWN`.
+
+**A3.3 Payment states and legal transitions**
+- `PROCESSING`: funds reserved; exactly one provider call (charge or lookup) is in flight for it.
+- `UNKNOWN`: funds reserved; the last provider call ended without a definitive answer (timeout, error, lookup `pending`/error).
+- `SUCCEEDED` (terminal): provider confirmed; reservation captured once.
+- `FAILED` (terminal): provider definitively declined; reservation released once.
+
+```
+create ─(reserve)→ PROCESSING ─succeeded→ SUCCEEDED   (capture)
+                         │      ─declined→ FAILED      (release)
+                         └─timeout/error/pending→ UNKNOWN
+UNKNOWN ─reconcile or same-key retry (CAS)→ PROCESSING ─(lookup; if not_found → charge same key)→ …as above
+```
+Terminal states never change. Every transition is one synchronous compare-and-set inside `PaymentsService`, together with its ledger entry.
+
+**A3.4 Provider contract (expected of a real provider, not assumed)**
+`charge({idempotencyKey,…})` → `succeeded | declined`, throws when the outcome is unknown. `lookup(idempotencyKey)` → `succeeded | declined | pending | not_found`. `not_found` means "no record yet", **not** "will never be charged". We need the real provider to: honour idempotency keys on charge for at least our retry window, offer lookup by our key (or store their ID from a response we never received — impossible, so key-lookup is required), and make declines definitive. If a candidate provider lacks key lookup, we'd need webhooks or a different design. Service-level timeout: `PROVIDER_TIMEOUT_MS` (default 3000).
+
+**A3.5 Simulator scenarios (deterministic, dev-only control)**
+`approve`, `decline`, `timeout_before_charge` (no record, response "times out"), `charge_then_timeout` (records the success, then the response is lost). The selected mode applies to new charge keys; a repeated key returns its stored outcome. Lookup returns the stored record or `not_found`. Tests may also inject a controllable provider (deferred promises) to force interleavings.
+
+**A3.6 Idempotency**
+The `Idempotency-Key` header is required on `POST /payments`. It's stored under `(actingUserId, 'payment', key)` with a fingerprint of the normalized `{accountId, amountMinor, reference}`. Same key + same payload → the existing payment, with no new reserve or charge; if it's `UNKNOWN`, it's reconciled first. Same key + different payload → **409** `IDEMPOTENCY_KEY_REUSED`. Another user's identical key is a different scope, so nothing about the first user's payment is visible. A rejected request (validation, 404, insufficient funds) records no key. The store is in memory: no durability across restarts.
+
+**A3.7 Synchronization strategy (single process)**
+One rule everywhere: **every check-and-mutate of money or payment state is a single synchronous function with no `await`** (ledger methods, payment CAS transitions). Provider waits happen only outside them. Node runs one JavaScript task at a time, so these critical sections are atomic relative to every other request in this process. No locks are needed or held across network waits. **Scope:** one Node process with in-memory state. No crash recovery, no durable idempotency, no multi-instance safety. A DB version would need transactions/conditional updates and a durable idempotency table.
+
+**A3.8 New endpoints / UI**
+`POST /payments/:id/reconcile` (owner only). The UI shows Available/Reserved, labels `PROCESSING`/`UNKNOWN` as unresolved, offers "Check status" on unresolved payments, and keeps the same Idempotency-Key when retrying a payment whose response was lost.

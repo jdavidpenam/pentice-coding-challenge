@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Account, LedgerEntry, Payment, Transfer, User } from './models.js';
+import type { Account, IdempotencyRecord, LedgerEntry, Payment, Transfer, User } from './models.js';
 
 /**
  * Process-local state. Lost on restart; mutable, so not a tamper-proof audit trail.
@@ -12,4 +12,6 @@ export class InMemoryStore {
   readonly ledger: LedgerEntry[] = [];
   readonly transfers = new Map<string, Transfer>();
   readonly payments = new Map<string, Payment>();
+  /** Key: `${userId}:payment:${idempotencyKey}`. */
+  readonly idempotency = new Map<string, IdempotencyRecord>();
 }

@@ -7,7 +7,7 @@ import { LedgerService } from './ledger/ledger.service.js';
 import { DevProviderController } from './payments/dev-provider.controller.js';
 import { PAYMENT_PROVIDER } from './payments/payment-provider.js';
 import { PaymentsController } from './payments/payments.controller.js';
-import { PaymentsService } from './payments/payments.service.js';
+import { PAYMENTS_CONFIG, PaymentsService, type PaymentsConfig } from './payments/payments.service.js';
 import { SimulatedPaymentProvider } from './payments/simulated-payment-provider.js';
 import { InMemoryStore } from './store/in-memory-store.js';
 import { TransfersController } from './transfers/transfers.controller.js';
@@ -17,7 +17,7 @@ import { UsersService } from './users/users.service.js';
 
 @Module({})
 export class AppModule {
-  static forRoot(config: Pick<AppConfig, 'devTools'>): DynamicModule {
+  static forRoot(config: Pick<AppConfig, 'devTools' | 'providerTimeoutMs'>): DynamicModule {
     return {
       module: AppModule,
       controllers: [
@@ -35,6 +35,7 @@ export class AppModule {
         AccountsService,
         TransfersService,
         PaymentsService,
+        { provide: PAYMENTS_CONFIG, useValue: { providerTimeoutMs: config.providerTimeoutMs } satisfies PaymentsConfig },
         SimulatedPaymentProvider,
         // Swap a real provider in here: { provide: PAYMENT_PROVIDER, useClass: RealProviderAdapter }.
         { provide: PAYMENT_PROVIDER, useExisting: SimulatedPaymentProvider },

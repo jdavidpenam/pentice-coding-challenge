@@ -53,7 +53,7 @@ export function TransferForm({ userId, accounts, directory, onChanged }: Props) 
             <option value="">Choose an account…</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.name} — {formatMinor(a.balanceMinor)}
+                {a.name} — {formatMinor(a.availableMinor)} available
               </option>
             ))}
           </select>

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { api, describeError, type SimulatorMode } from '../api';
+import { api, describeError, SIMULATOR_MODES, type SimulatorMode } from '../api';
+
+const MODE_LABEL = {
+  approve: 'Approve',
+  decline: 'Decline (nothing charged)',
+  timeout_before_charge: 'Time out before charging',
+  charge_then_timeout: 'Charge, then lose the response',
+} as const satisfies Record<SimulatorMode, string>;
 
 /** Rendered only in `vite dev`. Talks to an API route that exists only when the API runs with DEV_TOOLS=true. */
 export function DevProviderPanel() {
@@ -28,11 +35,11 @@ export function DevProviderPanel() {
       {error && <p role="alert" className="status error">{error}</p>}
       {mode && (
         <fieldset>
-          <legend>Next payments will be</legend>
-          {(['approve', 'decline'] as const).map((m) => (
+          <legend>New charges will</legend>
+          {SIMULATOR_MODES.map((m) => (
             <label key={m} className="inline">
               <input type="radio" name="sim-mode" checked={mode === m} onChange={() => { change(m); }} />
-              {m === 'approve' ? 'Approved' : 'Declined'}
+              {MODE_LABEL[m]}
             </label>
           ))}
         </fieldset>

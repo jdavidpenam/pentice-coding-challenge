@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
@@ -20,8 +21,10 @@ export interface TestUser {
 }
 
 /** Boots the real app (same HTTP config as main.ts) with an empty in-memory store and no seed. */
-export async function createTestApp(options: { devTools?: boolean; provider?: PaymentProvider } = {}) {
-  let builder = Test.createTestingModule({ imports: [AppModule.forRoot({ devTools: options.devTools ?? true })] });
+export async function createTestApp(options: { devTools?: boolean; provider?: PaymentProvider; providerTimeoutMs?: number } = {}) {
+  let builder = Test.createTestingModule({
+    imports: [AppModule.forRoot({ devTools: options.devTools ?? true, providerTimeoutMs: options.providerTimeoutMs ?? 200 })],
+  });
   if (options.provider) builder = builder.overrideProvider(PAYMENT_PROVIDER).useValue(options.provider);
   const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false, logger: false });
@@ -48,11 +51,14 @@ export async function createTestApp(options: { devTools?: boolean; provider?: Pa
     return account.id;
   }
 
-  function balance(accountId: string): number {
-    const account = store.accounts.get(accountId);
-    if (!account) throw new Error('no such account');
-    return account.balanceMinor;
+  function account(accountId: string): Account {
+    const found = store.accounts.get(accountId);
+    if (!found) throw new Error('no such account');
+    return found;
   }
+  /** Available (spendable) cents. */
+  const balance = (accountId: string): number => account(accountId).availableMinor;
+  const reserved = (accountId: string): number => account(accountId).reservedMinor;
 
   /** Deep copy of all financial state, to prove a rejected request changed nothing. */
   function snapshot() {
@@ -61,23 +67,39 @@ export async function createTestApp(options: { devTools?: boolean; provider?: Pa
       ledger: [...store.ledger],
       transfers: [...store.transfers.values()],
       payments: [...store.payments.values()],
+      idempotency: [...store.idempotency.entries()],
     });
   }
 
-  /** Every balance equals the sum of its ledger entries and is never negative. */
+  /**
+   * Each bucket equals the sum of its ledger deltas and is never negative, and every account's reserved funds equal
+   * the amounts of its unresolved (PROCESSING/UNKNOWN) payments.
+   */
   function expectLedgerConsistent(): void {
-    for (const account of store.accounts.values()) {
-      const sum = store.ledger.filter((e) => e.accountId === account.id).reduce((acc, e) => acc + e.amountMinor, 0);
-      expect(account.balanceMinor).toBe(sum);
-      expect(account.balanceMinor).toBeGreaterThanOrEqual(0);
+    for (const acc of store.accounts.values()) {
+      const entries = store.ledger.filter((e) => e.accountId === acc.id);
+      expect(acc.availableMinor).toBe(entries.reduce((sum, e) => sum + e.availableDeltaMinor, 0));
+      expect(acc.reservedMinor).toBe(entries.reduce((sum, e) => sum + e.reservedDeltaMinor, 0));
+      expect(acc.availableMinor).toBeGreaterThanOrEqual(0);
+      expect(acc.reservedMinor).toBeGreaterThanOrEqual(0);
+      const unresolved = [...store.payments.values()].filter(
+        (p) => p.accountId === acc.id && (p.status === 'PROCESSING' || p.status === 'UNKNOWN'),
+      );
+      expect(acc.reservedMinor).toBe(unresolved.reduce((sum, p) => sum + p.amountMinor, 0));
     }
   }
 
+  /** Money held inside the system: available + reserved across all accounts. */
   function totalFunds(): number {
-    return [...store.accounts.values()].reduce((acc, a) => acc + a.balanceMinor, 0);
+    return [...store.accounts.values()].reduce((sum, a) => sum + a.availableMinor + a.reservedMinor, 0);
   }
 
-  return { app, http, store, ledger, simulator, createUser, openAccount, balance, snapshot, expectLedgerConsistent, totalFunds };
+  /** POST /api/payments with a fresh Idempotency-Key unless one is given. */
+  function pay(actor: TestUser, body: object, idempotencyKey: string = randomUUID()) {
+    return http().post('/api/payments').set(HEADER, actor.id).set('idempotency-key', idempotencyKey).send(body);
+  }
+
+  return { app, http, store, ledger, simulator, createUser, openAccount, balance, reserved, snapshot, expectLedgerConsistent, totalFunds, pay };
 }
 
 export type TestApp = Awaited<ReturnType<typeof createTestApp>>;

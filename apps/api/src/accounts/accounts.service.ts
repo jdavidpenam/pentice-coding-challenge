@@ -27,7 +27,8 @@ export class AccountsService {
       userId: owner.id,
       name,
       currency: CURRENCY,
-      balanceMinor: 0,
+      availableMinor: 0,
+      reservedMinor: 0,
       createdAt: nowIso(),
     };
     this.store.accounts.set(account.id, account);

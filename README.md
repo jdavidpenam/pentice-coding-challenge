@@ -36,6 +36,7 @@ API environment variables:
 | `PORT` | `3000` | API port |
 | `DEV_TOOLS` | off (the `dev` script sets `true`) | Exposes `/api/dev/provider` simulator controls. Never on when `NODE_ENV=production`. |
 | `SEED_DEMO_DATA` | on | Set to `false` to start with no users |
+| `PROVIDER_TIMEOUT_MS` | `3000` | How long to wait for one provider call before treating its outcome as unknown |
 
 ## What it does
 
@@ -48,54 +49,111 @@ API environment variables:
 | Who you can send to (names + account IDs only) | `GET /api/directory` | "Transfer → To" |
 | Transfer to your own account or another user's | `POST /api/transfers` | "Transfer" |
 | Transfers you sent or received | `GET /api/transfers` | "Activity → Transfers" |
-| Pay for a room through the simulated provider | `POST /api/payments` | "Pay for a room" |
+| Pay for a room through the simulated provider (requires an `Idempotency-Key` header) | `POST /api/payments` | "Pay for a room" |
+| Resolve an unconfirmed payment with the provider | `POST /api/payments/:id/reconcile` | "Check status" in Activity → Payments |
 | Your payments and their status | `GET /api/payments`, `/:id` | "Activity → Payments" |
-| Simulator: approve or decline next payments (dev only) | `GET /api/dev/provider`, `POST /api/dev/provider/mode` | "Simulated provider (dev only)" |
+| Simulator scenario for new charges: approve, decline, timeout before charge, charge then lost response (dev only) | `GET /api/dev/provider`, `POST /api/dev/provider/mode` | "Simulated provider (dev only)" |
 
 Every endpoint except `/users` and `/dev/*` needs the `X-Demo-User-Id` header.
 
 ## Money rules
 
-- **One currency, USD. All amounts are integer cents** (`balanceMinor`, `amountMinor`). There's no floating-point money maths anywhere.
+- **One currency, USD. All amounts are integer cents** (`availableMinor`, `reservedMinor`, `amountMinor`). There's no floating-point money maths anywhere.
 - **The API accepts only JSON integers**, from 1 to 100,000,000 cents ($1,000,000.00). Strings, decimals, zero, negatives, unsafe integers, and amounts above the cap get 400. Nothing is coerced or rounded.
 - **The UI parses typed text using string operations.** `"12.34"` becomes `1234`. `"1.234"`, `"1e3"`, and `"1,000"` are rejected, not repaired (`apps/web/src/money.ts`).
-- **Balance cap.** A transfer may not push an account above $10,000,000,000.00 (422 `BALANCE_LIMIT_EXCEEDED`). Returning held payment funds after a decline is deliberately exempt, because returning money must never fail. It can't overflow, since amounts are capped.
+- **Two buckets per account.** `availableMinor` is spendable. `reservedMinor` is held for payments the provider hasn't confirmed. Transfers and new payments can only use available funds.
+- **Balance cap.** A transfer may not push an account's total (available + reserved) above $10,000,000,000.00 (422 `BALANCE_LIMIT_EXCEEDED`). Releasing a reservation moves money between buckets, so it never changes the total.
 - **Funding.** There's no deposit endpoint. Money enters only through the startup seed (`apps/api/src/seed.ts`), recorded as `SEED` ledger entries. New users get money by receiving a transfer.
 
 ### Where the money flow lives
 
 | File | Role |
 |---|---|
-| `apps/api/src/ledger/ledger.service.ts` | **The only code that changes balances.** `transfer`, `holdForPayment`, `releasePaymentHold`, `seed`. Each one is synchronous and all-or-nothing: all checks first, then all writes. |
+| `apps/api/src/ledger/ledger.service.ts` | **The only code that changes balances.** `transfer`, `reserveForPayment`, `captureReservation`, `releaseReservation`, `seed`. Each one is synchronous and all-or-nothing: all checks first, then all writes. |
 | `apps/api/src/transfers/transfers.service.ts` | Source-ownership check, then a ledger transfer, then the transfer record |
-| `apps/api/src/payments/payments.service.ts` | Payment flow and state machine (below) |
+| `apps/api/src/payments/payments.service.ts` | Payment flow, idempotency, reconciliation, state machine (below) |
 | `apps/api/src/payments/payment-provider.ts` | The provider interface: the seam for a real provider |
 | `apps/api/src/payments/simulated-payment-provider.ts` | The stub provider, with its own books, separate from our ledger |
 | `apps/api/src/common/money.ts` | Currency, limits, amount schema |
 | `apps/api/src/common/acting-user.ts` | The single demo-identity boundary |
 
-**Invariant (asserted after every test in the transfer and payment suites):** every account's `balanceMinor` equals the sum of its ledger entries and is never negative. A transfer writes `TRANSFER_OUT −X` and `TRANSFER_IN +X` under one transfer ID, so the total of internal funds is unchanged.
+**Invariants (asserted after every test in the transfer and payment suites):**
+- each bucket equals the sum of its ledger deltas and is never negative;
+- an account's reserved funds equal the amounts of its unresolved (`PROCESSING`/`UNKNOWN`) payments;
+- a transfer writes `TRANSFER_OUT −X` and `TRANSFER_IN +X` under one transfer ID, so the total of internal funds is unchanged.
 
 ### Payment semantics
 
-1. Check that the acting user owns the account (otherwise 404).
-2. **Hold:** in one synchronous step, check funds and write `PAYMENT_HOLD −X`. If funds are insufficient, it's a 422, nothing is written, and the provider is not called.
-3. Call `provider.charge({ idempotencyKey: paymentId, … })`.
-4. The outcome is applied by a synchronous compare-and-set that only moves a `PENDING` payment:
-   - **Confirmed success** → `SUCCEEDED`. The hold becomes the final debit.
-   - **Definitive decline** → `FAILED`. `PAYMENT_RELEASE +X` returns the funds.
-   - **The provider throws** (the outcome is unknown) → stays `PENDING`, funds stay held. The response is still `201`, with `status: "PENDING"`. The UI says "The provider did not confirm the payment. Your funds are held until it is resolved." Releasing here could hand back money the provider already took.
+| Ledger entry | available | reserved | When |
+|---|---|---|---|
+| `PAYMENT_RESERVE` | −X | +X | before the provider is contacted |
+| `PAYMENT_CAPTURE` | | −X | the provider **confirmed** the charge (money leaves) |
+| `PAYMENT_RELEASE` | +X | −X | the provider **definitively** declined |
 
-**Why hold before charging?** The provider call is `await`ed. If we checked the balance, awaited, and then debited, two concurrent payments could both pass the check. Taking the funds first, before any `await`, closes that gap.
+**States and legal transitions** (`apps/api/src/payments/payments.service.ts`):
 
-**Not handled in this milestone (it's the senior-bonus milestone, not done yet):** resolving `PENDING`/unknown outcomes (reconciliation), client idempotency keys and safe retries, timeout and "failed after charging" simulation, and concurrency tests. Nothing here claims those guarantees. The provider already receives the server-generated payment ID as its idempotency key, and the simulator de-duplicates by it, so that milestone can build on this design.
+```
+create ─reserve→ PROCESSING ─succeeded→ SUCCEEDED   capture, exactly once (terminal)
+                      │     ─declined→  FAILED      release, exactly once (terminal)
+                      └─timeout / error / lookup pending→ UNKNOWN   reservation kept
+UNKNOWN ─reconcile or same-key retry→ PROCESSING → lookup → (not_found → re-charge with the SAME key) → …
+```
+
+- `PROCESSING`: funds reserved, and exactly one provider call for this payment is in flight.
+- `UNKNOWN`: funds reserved, and the last provider call gave no definitive answer. **A timeout is never treated as a failure and never refunded automatically**, because the provider may have charged.
+- Every transition is a synchronous compare-and-set done together with its ledger entry. Only the caller that moves a payment into `PROCESSING` may call the provider for it, so concurrent reconciles or retries can't double-capture or double-release. Late provider answers that arrive after our timeout are ignored; only a lookup settles an `UNKNOWN` payment.
+- Amount, account, reference and the provider key always come from the **stored** payment. The provider key is always the server-generated payment ID, for the first charge, retries and lookups.
+
+**Idempotency.** `POST /api/payments` requires `Idempotency-Key` (8–100 characters of `A–Z a–z 0–9 _ -`; the web app sends a UUID).
+- The key is scoped to *(acting user, "payment", key)* and bound to the normalized payload `{accountId, amountMinor, reference}`.
+- Same key and same payload → the same payment, with no new reservation or charge. If that payment is `UNKNOWN`, it is reconciled first.
+- Same key and a different payload → **409** `IDEMPOTENCY_KEY_REUSED`.
+- Another user's identical key is a separate scope, so it can't reveal or reuse the first user's payment.
+- A rejected request (400, 404, 422) records no key.
+- Simultaneous duplicates: the key, the reservation and the payment record are written in one synchronous step before the first `await`.
+
+**Reconciliation.** `POST /api/payments/:id/reconcile` (owner only, safe to repeat), or the "Check status" button. It runs `lookup(paymentId)` and then:
+- `succeeded` → capture;
+- `declined` → release;
+- `pending` or a lookup error → stays `UNKNOWN`, funds stay reserved;
+- `not_found` → re-send the charge with the same key. `not_found` means "no record yet", not "will never be charged", so it's never treated as failure.
+
+No background job: reconciliation runs only when the user asks or retries. Payments stay `UNKNOWN` until then.
+
+**Simulated provider scenarios** (dev panel or `POST /api/dev/provider/mode`; deterministic, never random). Each applies to new charge keys, and a repeated key returns its stored outcome:
+
+| Scenario | What happens |
+|---|---|
+| `approve` | Charge succeeds |
+| `decline` | Definitive rejection; nothing charged |
+| `timeout_before_charge` | The call times out; the provider recorded nothing |
+| `charge_then_timeout` | The provider charges, then the response is lost |
+
+The simulator's operation records are separate from the app's payments and ledger.
+
+**Why reserve before charging?** The provider call is `await`ed. If we checked the balance, awaited, and then debited, two concurrent operations could both pass the check. Reserving first, before any `await`, closes that gap.
+
+### Concurrency: what is guaranteed, and where
+
+One strategy everywhere: **every check-and-mutate of money or payment state is a single synchronous function with no `await`.** That covers ledger methods and payment state transitions. Provider calls happen only outside them, and no lock is ever held across a network wait. Node runs one JavaScript task at a time, so these sections are atomic relative to every other request **in this process**. No account locks are needed, so there's no lock ordering to get wrong.
+
+**Scope of the guarantees:** one Node process with in-memory state. There is **no crash recovery** (a restart loses payments, reservations and idempotency keys), **no durable idempotency**, and **no multi-instance safety**. A database-backed version would need transactions or conditional updates (`… WHERE available >= X`), a durable idempotency table, and a background reconciler.
+
+### What a real provider must support
+
+We don't assume every provider does all of this; it's a selection criterion:
+1. **Idempotency keys on charge**, honoured at least for our retry window.
+2. **Lookup by our key**, because after a lost response we never learn their charge ID.
+3. **Definitive declines**: a decline means nothing was or will be charged for that key.
+4. **Clear timeouts and errors** that the adapter can turn into "unknown" (throw).
+
+Without key lookup, we'd need webhooks plus a different reconciliation design.
 
 ### Replacing the provider
 
-Write a class that implements `PaymentProvider.charge()`:
-- resolve `succeeded` only when the provider confirmed the charge;
-- resolve `declined` only when it definitively refused;
-- **throw for anything ambiguous** (timeouts, 5xx, network).
+Write a class that implements `PaymentProvider`:
+- `charge`: resolve `succeeded` only when the provider confirmed the charge, `declined` only when it definitively refused, and **throw for anything ambiguous** (timeouts, 5xx, network);
+- `lookup(key)`: return `succeeded`, `declined`, `pending` or `not_found`, and throw if the lookup itself fails.
 
 Then change one binding in `apps/api/src/app.module.ts`:
 
@@ -103,7 +161,7 @@ Then change one binding in `apps/api/src/app.module.ts`:
 { provide: PAYMENT_PROVIDER, useClass: RealProviderAdapter }
 ```
 
-The service, controller, and ledger don't change. A test (AC12) runs the payment flow against a different provider implementation to show this. A real adapter should also validate the provider's response shape (an unexpected shape currently ends in a 500 with the payment left `PENDING` and funds held, which is safe but unhelpful).
+The service, controller, and ledger don't change. A test (AC12) runs the payment flow against a different provider implementation to show this. A real adapter should also validate the provider's response shape. An unexpected shape currently ends in a 500 with the payment left unresolved and its funds reserved, which is safe but unhelpful.
 
 ## Security: implemented protections
 
@@ -113,7 +171,7 @@ The service, controller, and ledger don't change. A test (AC12) runs the payment
 - **Ownership** is checked on transfer source, payment source, account detail and history, and payment reads. A resource you don't own gives the **same 404 as one that doesn't exist**. Transfers are listed only to their sender and recipient.
 - **Minimal recipient info:** the directory returns names and account IDs, never balances or history.
 - **No partial mutations:** ledger methods validate everything before writing. Tests compare a deep snapshot of all financial state before and after each rejected request.
-- **Payment outcomes come only from the provider via the backend.**
+- **Payment outcomes come only from the provider via the backend.** Payment status reads, retries and reconciliation are owner-only (404 otherwise), and the reconcile endpoint ignores any request body.
 - **Safe errors:** `{ "error": { "code", "message", "details"? } }`. No stack traces or internals; unexpected errors become a generic 500 and are logged server-side.
 - **Dev tools are off by default**, never on in production, and only change the simulator.
 - **Limits:** 10 accounts per user, 1,000 users in total (memory bound).
@@ -126,14 +184,14 @@ The service, controller, and ledger don't change. A test (AC12) runs the payment
 - **No authentication.** The `X-Demo-User-Id` header can be forged, and user IDs are listed publicly for the selector. Ownership checks are correct *given* an identity; they don't prove the caller owns it. Replace `ActingUserResolver` with verified auth to fix this.
 - **Unauthenticated user creation**, with no rate limiting (only a total cap).
 - **In-memory, mutable state.** It's lost on restart and is not a tamper-proof audit trail.
-- **Payments left `PENDING`** by a provider error stay held, with no resolution path until the bonus milestone.
-- **The UI's double-submit guard is not server-side idempotency.** It only stops repeated clicks in that browser tab.
+- **Unconfirmed payments stay `UNKNOWN`** (funds reserved) until someone presses "Check status" or retries. There's no background reconciler and no operator tooling.
+- **Single process, in memory:** no crash recovery, durable idempotency or multi-instance safety (see Concurrency).
+- **Transfers have no idempotency key.** The UI's double-submit guard only stops repeated clicks in that browser tab, so a retried transfer *request* would run twice. Payments are protected server-side by `Idempotency-Key`.
 - **API responses aren't validated at runtime by the web client.** It trusts its own backend's contract.
-- **Concurrency safety rests on Node's single thread.** Ledger methods never `await`. A database-backed version would need transactions or conditional updates.
 
 ## Deferred production requirements
 
-Real authentication and sessions; a persistent database with transactions; durable reconciliation and an outbox; provider webhooks with signature verification; an append-only audit log; rate limiting; idempotency keys on transfers; operator tooling for stuck payments; multi-currency; KYC/AML, fraud checks and limits; TLS, secrets management and observability; refunds and chargebacks.
+Real authentication and sessions; a persistent database with transactions; a durable idempotency store; a background reconciler and outbox; provider webhooks with signature verification; an append-only audit log; rate limiting; idempotency keys on transfers; operator tooling for stuck payments; multi-currency; KYC/AML, fraud checks and limits; TLS, secrets management and observability; refunds and chargebacks.
 
 ## Stack
 

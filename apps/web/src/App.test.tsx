@@ -14,13 +14,15 @@ interface Call {
   method: string;
   path: string;
   user: string | null;
+  key: string | null;
   body: unknown;
 }
 
 /** Minimal fake of the API: just enough state to watch the UI follow the server's numbers. */
-function fakeApi(options: { paymentStatus?: 'SUCCEEDED' | 'FAILED'; transferDelayMs?: number } = {}) {
+function fakeApi(options: { paymentStatus?: 'SUCCEEDED' | 'FAILED' | 'UNKNOWN'; transferDelayMs?: number } = {}) {
   let aliceBalance = 10_000;
   let readsFail = false;
+  let aliceReserved = 0;
   const payments: unknown[] = [];
   const calls: Call[] = [];
   const json = (status: number, data: unknown) => Promise.resolve(new Response(JSON.stringify(data), { status }));
@@ -30,14 +32,14 @@ function fakeApi(options: { paymentStatus?: 'SUCCEEDED' | 'FAILED'; transferDela
     const path = input.replace(/^\/api/, '');
     const headers = new Headers(init?.headers);
     const body: unknown = typeof init?.body === 'string' ? JSON.parse(init.body) : undefined;
-    calls.push({ method, path, user: headers.get('x-demo-user-id'), body });
+    calls.push({ method, path, user: headers.get('x-demo-user-id'), key: headers.get('idempotency-key'), body });
 
     if (readsFail && method === 'GET') return json(500, { error: { code: 'INTERNAL', message: 'Something went wrong.' } });
     if (path === '/users') return json(200, [{ id: ALICE, name: 'Alice' }, { id: BOB, name: 'Bob' }]);
     if (path === '/accounts')
       return json(200, [
-        { id: ALICE_MAIN, userId: ALICE, name: 'Main', currency: 'USD', balanceMinor: aliceBalance, createdAt: '' },
-        { id: ALICE_SAVINGS, userId: ALICE, name: 'Savings', currency: 'USD', balanceMinor: 0, createdAt: '' },
+        { id: ALICE_MAIN, userId: ALICE, name: 'Main', currency: 'USD', availableMinor: aliceBalance, reservedMinor: aliceReserved, createdAt: '' },
+        { id: ALICE_SAVINGS, userId: ALICE, name: 'Savings', currency: 'USD', availableMinor: 0, reservedMinor: 0, createdAt: '' },
       ]);
     if (path === '/directory') return json(200, [{ userId: BOB, name: 'Bob', accounts: [{ id: BOB_MAIN, name: 'Main' }] }]);
     if (path === '/transfers' && method === 'GET') return json(200, []);
@@ -52,7 +54,16 @@ function fakeApi(options: { paymentStatus?: 'SUCCEEDED' | 'FAILED'; transferDela
     }
     if (path === '/payments' && method === 'POST') {
       const { amountMinor, reference } = body as { amountMinor: number; reference: string };
-      const base = { id: 'p1', accountId: ALICE_MAIN, amountMinor, reference, createdAt: '', updatedAt: '' };
+      const base = { id: 'p1', accountId: ALICE_MAIN, amountMinor, reference, createdAt: '2026-10-20T00:00:00.000Z', updatedAt: '' };
+      const known = payments.find((p) => (p as { key: string }).key === headers.get('idempotency-key'));
+      if (known) return json(201, known);
+      if (options.paymentStatus === 'UNKNOWN') {
+        const unknown = { ...base, key: headers.get('idempotency-key'), status: 'UNKNOWN' };
+        aliceBalance -= amountMinor;
+        aliceReserved += amountMinor;
+        payments.push(unknown);
+        return json(201, unknown);
+      }
       if (options.paymentStatus === 'FAILED') {
         const failed = { ...base, status: 'FAILED', failureReason: 'Declined by the simulated provider.' };
         payments.push(failed);
@@ -62,6 +73,15 @@ function fakeApi(options: { paymentStatus?: 'SUCCEEDED' | 'FAILED'; transferDela
       const succeeded = { ...base, status: 'SUCCEEDED', providerChargeId: 'sim_ch_1' };
       payments.push(succeeded);
       return json(201, succeeded);
+    }
+    if (path === '/payments/p1/reconcile' && method === 'POST') {
+      const index = payments.findIndex((p) => (p as { id: string }).id === 'p1');
+      const current = payments[index] as { amountMinor: number; status: string };
+      if (current.status === 'UNKNOWN') {
+        aliceReserved -= current.amountMinor;
+        payments[index] = { ...current, status: 'SUCCEEDED', providerChargeId: 'sim_ch_1' };
+      }
+      return json(200, payments[index]);
     }
     return json(404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
   });
@@ -103,6 +123,7 @@ describe('App', () => {
   it('shows the selected user’s balances from the server and sends the demo identity header', async () => {
     await selectAlice();
     expect(within(accountsTable()).getByText('$100.00')).toBeTruthy();
+    expect(within(accountsTable()).getByRole('columnheader', { name: 'Reserved' })).toBeTruthy();
     expect(api.calls.filter((c) => c.path === '/accounts').every((c) => c.user === ALICE)).toBe(true);
   });
 
@@ -129,7 +150,7 @@ describe('App', () => {
 
     expect(await form.findByRole('status')).toHaveProperty('textContent', 'Sent $0.29.');
     expect(api.posts()).toEqual([
-      { method: 'POST', path: '/transfers', user: ALICE, body: { fromAccountId: ALICE_MAIN, toAccountId: BOB_MAIN, amountMinor: 29 } },
+      { method: 'POST', path: '/transfers', user: ALICE, key: null, body: { fromAccountId: ALICE_MAIN, toAccountId: BOB_MAIN, amountMinor: 29 } },
     ]);
     expect(await within(accountsTable()).findByText('$99.71')).toBeTruthy();
   });
@@ -171,8 +192,8 @@ describe('App', () => {
     const payments = within(screen.getByRole('region', { name: 'Activity' })).getAllByRole('table').at(-1);
     if (!payments) throw new Error('payments table missing');
     const row = await within(payments).findByRole('row', { name: /Room 9/ });
-    expect(row.textContent).toContain('FAILED');
-    expect(row.textContent).not.toContain('SUCCEEDED');
+    expect(row.textContent).toContain('Declined');
+    expect(row.textContent).not.toContain('Paid');
   });
 
   it('moves money between the user’s own accounts and clears a To that matches the new From', async () => {
@@ -195,7 +216,7 @@ describe('App', () => {
     await user.click(form.getByRole('button', { name: 'Send money' }));
     await form.findByRole('status');
     expect(api.posts()).toEqual([
-      { method: 'POST', path: '/transfers', user: ALICE, body: { fromAccountId: ALICE_MAIN, toAccountId: ALICE_SAVINGS, amountMinor: 1250 } },
+      { method: 'POST', path: '/transfers', user: ALICE, key: null, body: { fromAccountId: ALICE_MAIN, toAccountId: ALICE_SAVINGS, amountMinor: 1250 } },
     ]);
   });
 
@@ -209,5 +230,62 @@ describe('App', () => {
     await user.click(form.getByRole('button', { name: 'Send money' }));
     expect((await screen.findByText(/Could not refresh/)).textContent).toMatch(/Showing the last loaded data/);
     expect(screen.getByRole('region', { name: 'My accounts' })).toBeTruthy();
+  });
+
+  it('shows an unconfirmed payment as unresolved with funds reserved, and a retry reuses the same Idempotency-Key', async () => {
+    cleanup();
+    install({ paymentStatus: 'UNKNOWN' });
+    const user = await selectAlice();
+    const form = within(screen.getByRole('region', { name: 'Pay for a room' }));
+    await user.selectOptions(form.getByLabelText('Pay from'), ALICE_MAIN);
+    await user.type(form.getByLabelText(/Amount/), '20');
+    await user.type(form.getByLabelText('Booking reference'), 'Room 9');
+    await user.click(form.getByRole('button', { name: 'Pay' }));
+
+    expect((await form.findByRole('alert')).textContent).toMatch(/Not confirmed yet.*reserved/);
+    expect(await within(accountsTable()).findByText('$20.00')).toBeTruthy(); // reserved column
+    const row = await within(screen.getByRole('region', { name: 'Activity' })).findByRole('row', { name: /Room 9/ });
+    expect(row.textContent).toContain('Unconfirmed');
+    expect(row.textContent).not.toContain('Paid');
+
+    await user.click(form.getByRole('button', { name: 'Pay' })); // retry the same payment
+    await form.findByRole('alert');
+    const payPosts = api.posts().filter((c) => c.path === '/payments');
+    expect(payPosts).toHaveLength(2);
+    expect(payPosts[0]?.key).toMatch(/^[0-9a-f-]{36}$/);
+    expect(payPosts[1]?.key).toBe(payPosts[0]?.key);
+  });
+
+  it('uses a new Idempotency-Key for a different payment after a definitive result', async () => {
+    const user = await selectAlice();
+    const form = within(screen.getByRole('region', { name: 'Pay for a room' }));
+    await user.selectOptions(form.getByLabelText('Pay from'), ALICE_MAIN);
+    for (const amount of ['1', '1']) {
+      await user.type(form.getByLabelText(/Amount/), amount);
+      await user.type(form.getByLabelText('Booking reference'), 'Room 2');
+      await user.click(form.getByRole('button', { name: 'Pay' }));
+      await form.findByRole('status');
+    }
+    const keys = api.posts().filter((c) => c.path === '/payments').map((c) => c.key);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+
+  it('“Check status” reconciles the same payment by ID and shows the resolved outcome', async () => {
+    cleanup();
+    install({ paymentStatus: 'UNKNOWN' });
+    const user = await selectAlice();
+    const form = within(screen.getByRole('region', { name: 'Pay for a room' }));
+    await user.selectOptions(form.getByLabelText('Pay from'), ALICE_MAIN);
+    await user.type(form.getByLabelText(/Amount/), '20');
+    await user.type(form.getByLabelText('Booking reference'), 'Room 9');
+    await user.click(form.getByRole('button', { name: 'Pay' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Check status of payment Room 9' }));
+    const activity = within(screen.getByRole('region', { name: 'Activity' }));
+    expect((await activity.findByRole('status')).textContent).toMatch(/Paid \$20\.00/);
+    expect(api.posts().filter((c) => c.path === '/payments/p1/reconcile')).toHaveLength(1);
+    const row = await activity.findByRole('row', { name: /Room 9.*Paid/ });
+    expect(within(row).queryByRole('button')).toBeNull();
   });
 });

@@ -32,7 +32,7 @@ describe('transfers', () => {
 
     const transferId = (res.body as { id: string }).id;
     const entries = t.store.ledger.filter((e) => e.referenceId === transferId);
-    expect(entries.map((e) => [e.accountId, e.kind, e.amountMinor])).toEqual([
+    expect(entries.map((e) => [e.accountId, e.kind, e.availableDeltaMinor])).toEqual([
       [alice.mainAccountId, 'TRANSFER_OUT', -2_550],
       [aliceSavings, 'TRANSFER_IN', 2_550],
     ]);
@@ -108,6 +108,8 @@ describe('transfers', () => {
 
   it.each([
     ['balanceMinor', 1_000_000],
+    ['availableMinor', 1_000_000],
+    ['reservedMinor', 0],
     ['userId', '00000000-0000-4000-8000-000000000000'],
     ['initiatedByUserId', '00000000-0000-4000-8000-000000000000'],
     ['status', 'COMPLETED'],

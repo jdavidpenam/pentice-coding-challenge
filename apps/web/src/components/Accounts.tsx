@@ -34,14 +34,16 @@ export function Accounts({ userId, accounts, onChanged }: Props) {
           <thead>
             <tr>
               <th scope="col">Account</th>
-              <th scope="col" className="num">Balance (USD)</th>
+              <th scope="col" className="num">Available (USD)</th>
+              <th scope="col" className="num">Reserved</th>
             </tr>
           </thead>
           <tbody>
             {accounts.map((a) => (
               <tr key={a.id}>
                 <td>{a.name}</td>
-                <td className="num">{formatMinor(a.balanceMinor)}</td>
+                <td className="num">{formatMinor(a.availableMinor)}</td>
+                <td className="num" title="Held for payments the provider has not confirmed yet">{formatMinor(a.reservedMinor)}</td>
               </tr>
             ))}
           </tbody>

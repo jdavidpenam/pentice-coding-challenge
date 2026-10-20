@@ -6,7 +6,8 @@ export type DomainErrorCode =
   | 'INSUFFICIENT_FUNDS'
   | 'BALANCE_LIMIT_EXCEEDED'
   | 'ACCOUNT_LIMIT_REACHED'
-  | 'USER_LIMIT_REACHED';
+  | 'USER_LIMIT_REACHED'
+  | 'IDEMPOTENCY_KEY_REUSED';
 
 export interface ErrorDetail {
   readonly path: string;
@@ -33,6 +34,8 @@ export function httpStatusFor(code: DomainErrorCode): number {
       return 401;
     case 'NOT_FOUND':
       return 404;
+    case 'IDEMPOTENCY_KEY_REUSED':
+      return 409;
     case 'SAME_ACCOUNT':
     case 'INSUFFICIENT_FUNDS':
     case 'BALANCE_LIMIT_EXCEEDED':

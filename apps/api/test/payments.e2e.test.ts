@@ -2,56 +2,62 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ChargeRequest, PaymentProvider } from '../src/payments/payment-provider.js';
 import type { Payment, ProviderOutcome } from '../src/store/models.js';
-import { createTestApp, expectSafeError, HEADER, type TestApp, type TestUser } from './helpers.js';
+import { createTestApp, expectSafeError, HEADER, type TestApp } from './helpers.js';
 
-const pay = (t: TestApp, actor: TestUser, body: object) => t.http().post('/api/payments').set(HEADER, actor.id).send(body);
+const notFoundLookup: PaymentProvider['lookup'] = () => Promise.resolve({ status: 'not_found' });
 
-describe('payments through the simulated provider', () => {
+describe('payments through the simulated provider (core behaviour)', () => {
   let t: TestApp;
   afterEach(async () => {
     t.expectLedgerConsistent();
     await t.app.close();
   });
 
-  it('AC9: succeeds with enough balance, charges once, and debits exactly the amount', async () => {
+  const ledgerFor = (paymentId: string) =>
+    t.store.ledger.filter((e) => e.referenceId === paymentId).map((e) => [e.kind, e.availableDeltaMinor, e.reservedDeltaMinor]);
+
+  it('AC9: succeeds with enough balance, charges once, and debits exactly the amount (reserve, then capture)', async () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 4_200, reference: 'Room 101 #BK-7' }).expect(201);
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 4_200, reference: 'Room 101 #BK-7' }).expect(201);
     const payment = res.body as Payment;
 
     expect(payment).toMatchObject({ status: 'SUCCEEDED', amountMinor: 4_200, currency: 'USD', accountId: alice.mainAccountId });
     expect(payment.status === 'SUCCEEDED' && payment.providerChargeId).toMatch(/^sim_ch_/);
     expect(t.balance(alice.mainAccountId)).toBe(5_800);
+    expect(t.reserved(alice.mainAccountId)).toBe(0);
     expect(t.simulator.inspect().successfulCharges).toBe(1);
-    expect(t.store.ledger.filter((e) => e.referenceId === payment.id).map((e) => [e.kind, e.amountMinor])).toEqual([['PAYMENT_HOLD', -4_200]]);
-
+    expect(ledgerFor(payment.id)).toEqual([
+      ['PAYMENT_RESERVE', -4_200, 4_200],
+      ['PAYMENT_CAPTURE', 0, -4_200],
+    ]);
     const read = await t.http().get(`/api/payments/${payment.id}`).set(HEADER, alice.id).expect(200);
     expect(read.body).toEqual(payment);
   });
 
-  it('AC10: without enough balance it is rejected, the provider is never called, and nothing changes', async () => {
+  it('AC10: without enough available balance it is rejected, the provider is never called, and nothing changes', async () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 1_000);
     const before = t.snapshot();
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 1_001, reference: 'Room 5' });
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 1_001, reference: 'Room 5' });
     expectSafeError(res, 422, 'INSUFFICIENT_FUNDS');
-    expect(t.simulator.inspect().totalCalls).toBe(0);
+    expect(t.simulator.inspect().chargeCalls).toBe(0);
     expect(t.snapshot()).toEqual(before);
   });
 
-  it('AC11: a definitive decline ends FAILED and restores the balance', async () => {
+  it('AC11: a definitive decline ends FAILED and releases the reservation', async () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);
     t.simulator.configure({ mode: 'decline' });
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 3_000, reference: 'Room 9' }).expect(201);
-    const payment = res.body as Payment;
+    const payment = (await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 3_000, reference: 'Room 9' }).expect(201)).body as Payment;
 
     expect(payment.status).toBe('FAILED');
     expect(t.balance(alice.mainAccountId)).toBe(10_000);
+    expect(t.reserved(alice.mainAccountId)).toBe(0);
     expect(t.simulator.inspect().successfulCharges).toBe(0);
-    expect(t.store.ledger.filter((e) => e.referenceId === payment.id).map((e) => [e.kind, e.amountMinor])).toEqual([
-      ['PAYMENT_HOLD', -3_000],
-      ['PAYMENT_RELEASE', 3_000],
+    expect(ledgerFor(payment.id)).toEqual([
+      ['PAYMENT_RESERVE', -3_000, 3_000],
+      ['PAYMENT_RELEASE', 3_000, -3_000],
     ]);
   });
 
@@ -62,48 +68,49 @@ describe('payments through the simulated provider', () => {
         calls.push(request);
         return Promise.resolve({ status: 'succeeded', providerChargeId: 'other_123' });
       },
+      lookup: notFoundLookup,
     };
     t = await createTestApp({ provider: otherProvider });
     const alice = await t.createUser('Alice', 10_000);
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 700, reference: 'Room 3' }).expect(201);
-    const payment = res.body as Payment;
+    const payment = (await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 700, reference: 'Room 3' }).expect(201)).body as Payment;
 
     expect(payment).toMatchObject({ status: 'SUCCEEDED', providerChargeId: 'other_123' });
     expect(calls).toEqual([{ idempotencyKey: payment.id, amountMinor: 700, currency: 'USD', reference: 'Room 3' }]);
     expect(t.balance(alice.mainAccountId)).toBe(9_300);
   });
 
-  it('AC12: a definitive decline from a different provider also releases the hold', async () => {
-    const decliner: PaymentProvider = { charge: () => Promise.resolve({ status: 'declined', reason: 'Insufficient limit.' }) };
+  it('AC12: a definitive decline from a different provider also releases the reservation', async () => {
+    const decliner: PaymentProvider = { charge: () => Promise.resolve({ status: 'declined', reason: 'Insufficient limit.' }), lookup: notFoundLookup };
     t = await createTestApp({ provider: decliner });
     const alice = await t.createUser('Alice', 10_000);
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 700, reference: 'Room 3' }).expect(201);
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 700, reference: 'Room 3' }).expect(201);
     expect(res.body).toMatchObject({ status: 'FAILED', failureReason: 'Insufficient limit.' });
     expect(t.balance(alice.mainAccountId)).toBe(10_000);
   });
 
-  it('provider error (unknown outcome) keeps the payment PENDING with funds held — never released or guessed', async () => {
-    const failing: PaymentProvider = { charge: () => Promise.reject(new Error('socket hang up at internal.host:443')) };
+  it('a provider error is UNKNOWN: funds stay reserved, nothing is guessed, and no internals leak', async () => {
+    const failing: PaymentProvider = { charge: () => Promise.reject(new Error('socket hang up at internal.host:443')), lookup: notFoundLookup };
     t = await createTestApp({ provider: failing });
     const alice = await t.createUser('Alice', 10_000);
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 2_000, reference: 'Room 4' }).expect(201);
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 2_000, reference: 'Room 4' }).expect(201);
 
-    expect(res.body).toMatchObject({ status: 'PENDING', attempts: [{ error: 'PROVIDER_ERROR' }] });
+    expect(res.body).toMatchObject({ status: 'UNKNOWN', attempts: [{ operation: 'charge', result: 'error' }] });
     expect(JSON.stringify(res.body)).not.toContain('internal.host');
     expect(t.balance(alice.mainAccountId)).toBe(8_000);
+    expect(t.reserved(alice.mainAccountId)).toBe(2_000);
   });
 
   it('AC13: cannot pay from, read, or list another user’s account or payments', async () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);
     const bob = await t.createUser('Bob', 10_000);
-    const bobPayment = (await pay(t, bob, { accountId: bob.mainAccountId, amountMinor: 100, reference: 'Bob room' }).expect(201)).body as Payment;
+    const bobPayment = (await t.pay(bob, { accountId: bob.mainAccountId, amountMinor: 100, reference: 'Bob room' }).expect(201)).body as Payment;
 
     const before = t.snapshot();
-    const debit = await pay(t, alice, { accountId: bob.mainAccountId, amountMinor: 100, reference: 'Steal' });
+    const debit = await t.pay(alice, { accountId: bob.mainAccountId, amountMinor: 100, reference: 'Steal' });
     expectSafeError(debit, 404, 'NOT_FOUND');
     expect(t.snapshot()).toEqual(before);
-    expect(t.simulator.inspect().totalCalls).toBe(1);
+    expect(t.simulator.inspect().chargeCalls).toBe(1);
 
     expectSafeError(await t.http().get(`/api/payments/${bobPayment.id}`).set(HEADER, alice.id), 404, 'NOT_FOUND');
     expectSafeError(await t.http().get(`/api/payments/${randomUUID()}`).set(HEADER, alice.id), 404, 'NOT_FOUND');
@@ -115,14 +122,15 @@ describe('payments through the simulated provider', () => {
     ['providerChargeId', 'sim_ch_fake'],
     ['userId', '00000000-0000-4000-8000-000000000000'],
     ['attempts', []],
+    ['outcome', { status: 'succeeded' }],
   ])('rejects client-supplied server-controlled field %s', async (field, value) => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);
     const before = t.snapshot();
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, amountMinor: 100, reference: 'Room 1', [field]: value });
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, amountMinor: 100, reference: 'Room 1', [field]: value });
     expectSafeError(res, 400, 'VALIDATION_FAILED');
     expect(t.snapshot()).toEqual(before);
-    expect(t.simulator.inspect().totalCalls).toBe(0);
+    expect(t.simulator.inspect().chargeCalls).toBe(0);
   });
 
   it.each([
@@ -136,7 +144,22 @@ describe('payments through the simulated provider', () => {
     t = await createTestApp();
     const alice = await t.createUser('Alice', 10_000);
     const before = t.snapshot();
-    const res = await pay(t, alice, { accountId: alice.mainAccountId, ...partial });
+    const res = await t.pay(alice, { accountId: alice.mainAccountId, ...partial });
+    expectSafeError(res, 400, 'VALIDATION_FAILED');
+    expect(t.snapshot()).toEqual(before);
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['too short', 'abc'],
+    ['bad characters', 'key with spaces!!'],
+    ['too long', 'k'.repeat(101)],
+  ])('rejects a %s Idempotency-Key with 400 and no state change', async (_label, key) => {
+    t = await createTestApp();
+    const alice = await t.createUser('Alice', 10_000);
+    const before = t.snapshot();
+    const req = t.http().post('/api/payments').set(HEADER, alice.id);
+    const res = await (key === undefined ? req : req.set('idempotency-key', key)).send({ accountId: alice.mainAccountId, amountMinor: 100, reference: 'Room 1' });
     expectSafeError(res, 400, 'VALIDATION_FAILED');
     expect(t.snapshot()).toEqual(before);
   });
@@ -147,8 +170,8 @@ describe('payments through the simulated provider', () => {
     await t.app.close();
 
     t = await createTestApp({ devTools: true });
-    const res = await t.http().post('/api/dev/provider/mode').send({ mode: 'decline' }).expect(201);
-    expect(res.body).toMatchObject({ mode: 'decline' });
+    const res = await t.http().post('/api/dev/provider/mode').send({ mode: 'charge_then_timeout' }).expect(201);
+    expect(res.body).toMatchObject({ mode: 'charge_then_timeout' });
     expectSafeError(await t.http().post('/api/dev/provider/mode').send({ mode: 'charge_everyone' }), 400, 'VALIDATION_FAILED');
   });
 });

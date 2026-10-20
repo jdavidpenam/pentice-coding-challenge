@@ -9,7 +9,10 @@ export interface Account {
   readonly userId: string;
   readonly name: string;
   readonly currency: 'USD';
-  readonly balanceMinor: number;
+  /** Spendable cents. */
+  readonly availableMinor: number;
+  /** Cents held for unresolved payments. */
+  readonly reservedMinor: number;
   readonly createdAt: string;
 }
 export interface DirectoryEntry {
@@ -17,13 +20,15 @@ export interface DirectoryEntry {
   readonly name: string;
   readonly accounts: readonly { readonly id: string; readonly name: string }[];
 }
-export type LedgerEntryKind = 'SEED' | 'TRANSFER_OUT' | 'TRANSFER_IN' | 'PAYMENT_HOLD' | 'PAYMENT_RELEASE';
+export type LedgerEntryKind = 'SEED' | 'TRANSFER_OUT' | 'TRANSFER_IN' | 'PAYMENT_RESERVE' | 'PAYMENT_RELEASE' | 'PAYMENT_CAPTURE';
 export interface LedgerEntry {
   readonly id: string;
   readonly accountId: string;
   readonly kind: LedgerEntryKind;
-  readonly amountMinor: number;
-  readonly balanceAfterMinor: number;
+  readonly availableDeltaMinor: number;
+  readonly reservedDeltaMinor: number;
+  readonly availableAfterMinor: number;
+  readonly reservedAfterMinor: number;
   readonly referenceId: string;
   readonly createdAt: string;
 }
@@ -43,10 +48,12 @@ interface PaymentBase {
   readonly updatedAt: string;
 }
 export type Payment =
-  | (PaymentBase & { readonly status: 'PENDING' })
+  | (PaymentBase & { readonly status: 'PROCESSING' })
+  | (PaymentBase & { readonly status: 'UNKNOWN' })
   | (PaymentBase & { readonly status: 'SUCCEEDED'; readonly providerChargeId: string })
   | (PaymentBase & { readonly status: 'FAILED'; readonly failureReason: string });
-export type SimulatorMode = 'approve' | 'decline';
+export const SIMULATOR_MODES = ['approve', 'decline', 'timeout_before_charge', 'charge_then_timeout'] as const;
+export type SimulatorMode = (typeof SIMULATOR_MODES)[number];
 
 export class ApiError extends Error {
   constructor(
@@ -62,11 +69,13 @@ interface RequestOptions {
   readonly method?: 'GET' | 'POST';
   readonly body?: unknown;
   readonly userId?: string;
+  readonly idempotencyKey?: string;
 }
 
 async function call<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.userId) headers['x-demo-user-id'] = options.userId;
+  if (options.idempotencyKey) headers['idempotency-key'] = options.idempotencyKey;
   const init: RequestInit = { method: options.method ?? 'GET', headers };
   if (options.body !== undefined) {
     headers['content-type'] = 'application/json';
@@ -107,8 +116,11 @@ export const api = {
   transfer: (userId: string, body: { fromAccountId: string; toAccountId: string; amountMinor: number }) =>
     call<Transfer>('/transfers', { method: 'POST', userId, body }),
   payments: (userId: string) => call<Payment[]>('/payments', { userId }),
-  pay: (userId: string, body: { accountId: string; amountMinor: number; reference: string }) =>
-    call<Payment>('/payments', { method: 'POST', userId, body }),
+  /** Reuse the same idempotencyKey to retry the same payment safely; a new key means a new payment. */
+  pay: (userId: string, idempotencyKey: string, body: { accountId: string; amountMinor: number; reference: string }) =>
+    call<Payment>('/payments', { method: 'POST', userId, idempotencyKey, body }),
+  reconcile: (userId: string, paymentId: string) =>
+    call<Payment>(`/payments/${encodeURIComponent(paymentId)}/reconcile`, { method: 'POST', userId }),
   devProvider: () => call<{ mode: SimulatorMode }>('/dev/provider'),
   setDevProviderMode: (mode: SimulatorMode) => call<{ mode: SimulatorMode }>('/dev/provider/mode', { method: 'POST', body: { mode } }),
 };

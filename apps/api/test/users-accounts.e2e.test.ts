@@ -16,7 +16,7 @@ describe('users and accounts', () => {
     const res = await t.http().post('/api/users').send({ name: '  Dana ' }).expect(201);
     expect(res.body).toMatchObject({
       user: { id: expect.any(String), name: 'Dana' },
-      account: { name: 'Main', currency: 'USD', balanceMinor: 0 },
+      account: { name: 'Main', currency: 'USD', availableMinor: 0, reservedMinor: 0 },
     });
     expect(Object.keys(res.body.user as object).sort()).toEqual(['id', 'name']);
   });
@@ -28,7 +28,7 @@ describe('users and accounts', () => {
     ['markup', { name: '<script>' }],
     ['non-string', { name: 42 }],
     ['unexpected field', { name: 'Eve', id: randomUUID() }],
-    ['client-set balance', { name: 'Eve', balanceMinor: 1_000_000 }],
+    ['client-set balance', { name: 'Eve', availableMinor: 1_000_000 }],
   ])('AC1: rejects invalid user input (%s) and creates nothing', async (_label, body) => {
     const before = t.store.users.size;
     const res = await t.http().post('/api/users').send(body);
@@ -49,17 +49,17 @@ describe('users and accounts', () => {
     const savings = await t.openAccount(alice, 'Savings');
 
     const res = await t.http().get('/api/accounts').set(HEADER, alice.id).expect(200);
-    const accounts = res.body as { id: string; userId: string; balanceMinor: number }[];
+    const accounts = res.body as { id: string; userId: string; availableMinor: number }[];
     expect(accounts.map((a) => a.id).sort()).toEqual([alice.mainAccountId, savings].sort());
     expect(accounts.every((a) => a.userId === alice.id)).toBe(true);
-    expect(accounts.find((a) => a.id === alice.mainAccountId)?.balanceMinor).toBe(5_000);
+    expect(accounts.find((a) => a.id === alice.mainAccountId)?.availableMinor).toBe(5_000);
     expect(accounts.some((a) => a.id === bob.mainAccountId)).toBe(false);
   });
 
   it('AC2: rejects client-supplied balance or owner when opening an account', async () => {
     const alice = await t.createUser('Alice');
     const bob = await t.createUser('Bob');
-    for (const body of [{ name: 'Rich', balanceMinor: 99_999 }, { name: 'Theirs', userId: bob.id }]) {
+    for (const body of [{ name: 'Rich', availableMinor: 99_999 }, { name: 'Theirs', userId: bob.id }]) {
       const res = await t.http().post('/api/accounts').set(HEADER, alice.id).send(body);
       expectSafeError(res, 400, 'VALIDATION_FAILED');
     }
@@ -91,7 +91,7 @@ describe('users and accounts', () => {
     const alice = await t.createUser('Alice', 5_000);
     await t.http().get(`/api/accounts/${alice.mainAccountId}`).set(HEADER, alice.id).expect(200);
     const history = await t.http().get(`/api/accounts/${alice.mainAccountId}/transactions`).set(HEADER, alice.id).expect(200);
-    expect(history.body).toEqual([expect.objectContaining({ kind: 'SEED', amountMinor: 5_000, balanceAfterMinor: 5_000 })]);
+    expect(history.body).toEqual([expect.objectContaining({ kind: 'SEED', availableDeltaMinor: 5_000, availableAfterMinor: 5_000 })]);
   });
 
   it.each([
@@ -122,10 +122,11 @@ describe('users and accounts', () => {
     ['POST', '/api/transfers', { fromAccountId: randomUUID(), toAccountId: randomUUID(), amountMinor: 1 }],
     ['GET', '/api/payments', undefined],
     ['POST', '/api/payments', { accountId: randomUUID(), amountMinor: 1, reference: 'R1' }],
+    ['POST', `/api/payments/${randomUUID()}/reconcile`, undefined],
     ['GET', `/api/payments/${randomUUID()}`, undefined],
   ] as const)('every acting-user endpoint rejects an unknown demo identity: %s %s', async (method, path, body) => {
     const before = t.snapshot();
-    const req = method === 'GET' ? t.http().get(path) : t.http().post(path).send(body);
+    const req = method === 'GET' ? t.http().get(path) : t.http().post(path).set('idempotency-key', randomUUID()).send(body);
     const res = await req.set(HEADER, randomUUID());
     expectSafeError(res, 401, 'DEMO_USER_REQUIRED');
     expect(t.snapshot()).toEqual(before);

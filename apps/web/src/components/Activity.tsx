@@ -1,21 +1,48 @@
 import { useState } from 'react';
-import type { LedgerEntryKind } from '../api';
+import { api, type LedgerEntryKind, type Payment } from '../api';
 import { accountLabel, type Dashboard } from '../dashboard';
 import { formatMinor } from '../money';
+import { useSubmit } from '../use-submit';
 import { describePayment } from './PaymentForm';
+import { Status } from './Status';
 
 const KIND_LABEL = {
   SEED: 'Demo funding',
   TRANSFER_OUT: 'Transfer out',
   TRANSFER_IN: 'Transfer in',
-  PAYMENT_HOLD: 'Payment',
-  PAYMENT_RELEASE: 'Payment returned',
+  PAYMENT_RESERVE: 'Payment reserved',
+  PAYMENT_RELEASE: 'Reservation released',
+  PAYMENT_CAPTURE: 'Payment sent',
 } as const satisfies Record<LedgerEntryKind, string>;
 
 const time = (iso: string) => new Date(iso).toLocaleString();
 
-export function Activity({ dashboard }: { dashboard: Dashboard }) {
+const STATUS_LABEL = {
+  PROCESSING: 'Processing',
+  UNKNOWN: 'Unconfirmed',
+  SUCCEEDED: 'Paid',
+  FAILED: 'Declined',
+} as const satisfies Record<Payment['status'], string>;
+
+interface Props {
+  readonly userId: string;
+  readonly dashboard: Dashboard;
+  readonly onChanged: () => void;
+}
+
+export function Activity({ userId, dashboard, onChanged }: Props) {
   const [selected, setSelected] = useState('');
+  // Lives here, not in the row, so the outcome stays visible after the row's button disappears.
+  const check = useSubmit();
+
+  /** Asks the backend to reconcile this payment with the provider. Same payment ID every time; safe to repeat. */
+  function checkStatus(payment: Payment) {
+    void check.run(async () => {
+      const updated = await api.reconcile(userId, payment.id);
+      onChanged();
+      return { kind: updated.status === 'SUCCEEDED' ? 'success' : 'error', message: `${payment.reference}: ${describePayment(updated)}` };
+    });
+  }
   const accountId = dashboard.accounts.some((a) => a.id === selected) ? selected : (dashboard.accounts[0]?.id ?? '');
   const entries = dashboard.transactions.get(accountId) ?? [];
 
@@ -43,8 +70,9 @@ export function Activity({ dashboard }: { dashboard: Dashboard }) {
               <tr>
                 <th scope="col">When</th>
                 <th scope="col">What</th>
-                <th scope="col" className="num">Amount</th>
-                <th scope="col" className="num">Balance after</th>
+                <th scope="col" className="num">Available</th>
+                <th scope="col" className="num">Reserved</th>
+                <th scope="col" className="num">Available after</th>
               </tr>
             </thead>
             <tbody>
@@ -52,8 +80,9 @@ export function Activity({ dashboard }: { dashboard: Dashboard }) {
                 <tr key={e.id}>
                   <td>{time(e.createdAt)}</td>
                   <td>{KIND_LABEL[e.kind]}</td>
-                  <td className={`num ${e.amountMinor < 0 ? 'out' : 'in'}`}>{formatMinor(e.amountMinor)}</td>
-                  <td className="num">{formatMinor(e.balanceAfterMinor)}</td>
+                  <td className={`num ${e.availableDeltaMinor < 0 ? 'out' : 'in'}`}>{e.availableDeltaMinor === 0 ? '—' : formatMinor(e.availableDeltaMinor)}</td>
+                  <td className="num">{e.reservedDeltaMinor === 0 ? '—' : formatMinor(e.reservedDeltaMinor)}</td>
+                  <td className="num">{formatMinor(e.availableAfterMinor)}</td>
                 </tr>
               ))}
             </tbody>
@@ -90,6 +119,7 @@ export function Activity({ dashboard }: { dashboard: Dashboard }) {
       )}
 
       <h3>Payments</h3>
+      <Status result={check.result} />
       {dashboard.payments.length === 0 ? (
         <p>No payments yet.</p>
       ) : (
@@ -102,6 +132,7 @@ export function Activity({ dashboard }: { dashboard: Dashboard }) {
                 <th scope="col">From</th>
                 <th scope="col" className="num">Amount</th>
                 <th scope="col">Status</th>
+                <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -113,8 +144,20 @@ export function Activity({ dashboard }: { dashboard: Dashboard }) {
                   <td className="num">{formatMinor(p.amountMinor)}</td>
                   <td>
                     <span className={`badge ${p.status.toLowerCase()}`} title={describePayment(p)}>
-                      {p.status}
+                      {STATUS_LABEL[p.status]}
                     </span>
+                  </td>
+                  <td className="action">
+                    {p.status === 'UNKNOWN' || p.status === 'PROCESSING' ? (
+                      <button
+                        type="button"
+                        disabled={check.pending}
+                        aria-label={`Check status of payment ${p.reference}`}
+                        onClick={() => { checkStatus(p); }}
+                      >
+                        {check.pending ? 'Checking…' : 'Check status'}
+                      </button>
+                    ) : null}
                   </td>
                 </tr>
               ))}

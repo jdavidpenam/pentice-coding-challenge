@@ -81,7 +81,7 @@ export function App() {
             <Accounts userId={userId} accounts={current.data.accounts} onChanged={refresh} />
             <TransferForm userId={userId} accounts={current.data.accounts} directory={current.data.directory} onChanged={refresh} />
             <PaymentForm userId={userId} accounts={current.data.accounts} onChanged={refresh} />
-            <Activity dashboard={current.data} />
+            <Activity userId={userId} dashboard={current.data} onChanged={refresh} />
           </div>
         )}
         {import.meta.env.DEV && <DevProviderPanel />}
