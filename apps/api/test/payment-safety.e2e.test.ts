@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { MAX_BALANCE_MINOR } from '../src/common/money.js';
+import { PaymentsService } from '../src/payments/payments.service.js';
 import { ProviderTimeoutError, type ChargeRequest, type PaymentProvider } from '../src/payments/payment-provider.js';
 import type { Payment, ProviderLookup, ProviderOutcome } from '../src/store/models.js';
 import { createTestApp, expectSafeError, HEADER, type TestApp, type TestUser } from './helpers.js';
@@ -164,6 +166,22 @@ describe('payment safety and concurrency (senior bonus)', () => {
       expect(t.totalFunds()).toBe(total);
     });
 
+    it('the balance cap counts reserved funds: a credit cannot push available + reserved over the limit', async () => {
+      await setup();
+      const whale = await t.createUser('Whale');
+      t.ledger.seed(whale.mainAccountId, MAX_BALANCE_MINOR - 100);
+      const parked = provider.parkNextCharge();
+      const paying = t.http().post('/api/payments').set(HEADER, whale.id).set('idempotency-key', randomUUID())
+        .send({ accountId: whale.mainAccountId, amountMinor: 50_000, reference: 'Suite' }).then((r) => r);
+      await parked.arrived.promise; // 50,000 of the whale's money is now reserved, not available
+      const before = t.snapshot();
+      expectSafeError(await transfer(alice, alice.mainAccountId, whale.mainAccountId, 101), 422, 'BALANCE_LIMIT_EXCEEDED');
+      expect(t.snapshot()).toEqual(before);
+      parked.release.resolve({ status: 'declined', reason: 'Card declined.' });
+      expect(((await paying).body as Payment).status).toBe('FAILED');
+      expect(t.balance(whale.mainAccountId) + t.reserved(whale.mainAccountId)).toBe(MAX_BALANCE_MINOR - 100);
+    });
+
     it('3: a transfer cannot spend funds reserved by an in-flight payment', async () => {
       await setup();
       const parked = provider.parkNextCharge();
@@ -215,6 +233,23 @@ describe('payment safety and concurrency (senior bonus)', () => {
       expect(ids.size).toBe(1);
       expect(provider.chargeRequests).toHaveLength(1);
       expect(t.balance(alice.mainAccountId)).toBe(6_000);
+    });
+
+    it('4: the key, reservation, and payment are all recorded before create() yields for the first time', async () => {
+      await setup();
+      const service = t.app.get(PaymentsService);
+      const actor = t.store.users.get(alice.id);
+      if (!actor) throw new Error('missing user');
+      const parked = provider.parkNextCharge();
+      const key = randomUUID();
+      const pending = service.create(actor, key, body());
+      // No await yet: anything not written synchronously would be missing here, even a single microtask gap.
+      expect(t.store.idempotency.has(`${alice.id}:payment:${key}`)).toBe(true);
+      expect(t.reserved(alice.mainAccountId)).toBe(4_000);
+      expect(t.store.payments.size).toBe(1);
+      await parked.arrived.promise;
+      parked.release.resolve({ status: 'succeeded', providerChargeId: 'ch_sync' });
+      expect((await pending).status).toBe('SUCCEEDED');
     });
 
     it('a replay after success returns the stored result without touching the provider or ledger', async () => {

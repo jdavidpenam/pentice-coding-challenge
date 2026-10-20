@@ -85,3 +85,23 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 
 **Post-fix verification (2026-10-19T19:40:41-05:00):** `npm run check` exit 0 — API 82/82, web 34/34, lint, typecheck, builds.
 **Milestone status:** A and B complete and reviewed. No unresolved Blocking/High/Medium findings. Accepted Low items: R-A F5 (adapter response validation deferred), R-B L4 (dev client code in prod bundle). Not covered: a real-browser and screen-reader pass.
+
+---
+
+## R-S — Senior bonus review
+
+- **Snapshot:** `e62bded` (diff vs `1357184`) · **Reviewer context:** fresh general-purpose subagent, adversarial brief (state transitions, reservation accounting, synchronization, idempotency scope, provider ambiguity, authorization, test effectiveness, honesty of claims), budget ≈15 min. It worked on a scratch `git archive` copy at /tmp/rev-bonus; the repo was not modified.
+- **Requested:** 2026-10-19T19:55:51-05:00 (00:55:51Z) · **Returned:** by 2026-10-19T19:58:26-05:00 (00:58:26Z) (first clock capture after the report; reported duration ≈137 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — 0 Blocking/High/Medium, 4 Low.
+- **IDs checked:** B1–B4, AC14–AC18, AC21–AC23 (as applicable), A3.x (not every sub-clause line by line).
+- **Reviewer's own checks:** `npm ci` + `npm run check` exit 0 (API 112/112, web 37/37). Ten mutations of its own, M1–M9 with M5 in two variants (a, b). Killed: timeout→release, not_found→decline, setImmediate gap before key write, different provider key on retry, reference dropped from fingerprint, replay skipping reconcile. Survived: claim guard and applyOutcome guard (unreachable; already disclosed), microtask gap before key write (L2), cap ignoring reserved (L1). Confirmed tests 3, 4, 11, and 12-late genuinely park the provider and force their interleavings, and that none of tests 1–14 is vacuous. The only `await`s in `src` are the two provider calls. TIMELOG E14/E15 consistent.
+- **Not performed by reviewer:** browser-driven UI check; mutations of UI tests; live smoke.
+
+| ID | Sev | Location | Finding | Resolution |
+|---|---|---|---|---|
+| S-L1 | Low | `ledger.service.ts` transfer cap | No test that the cap counts reserved funds (its mutant survived). | Fixed: new e2e test parks a charge on the destination, then a transfer that only exceeds the cap counting reserved → 422, state unchanged. Mutant now killed (1 failed / 113). |
+| S-L2 | Low | `payment-safety` test 4 | Duplicate test caught a macrotask gap but not a microtask `await` before the key write. | Fixed: new test calls `PaymentsService.create()` without awaiting and asserts that key, reservation, and payment already exist synchronously. Microtask mutant now killed (1 failed / 113). |
+| S-L3 | Low | README provider contract | Reconciliation has no age limit; if a real provider expires keys/records, a late `not_found` would re-charge. | Disclosed in README as an explicit assumption, with the production mitigation (stop auto re-charge after the retention window → operator). Not changed in code. |
+| S-L4 | Low (UX) | `PaymentForm.tsx` | Editing the form after an UNKNOWN result starts a new payment (new key) without a warning; no overspend possible. | Accepted as deliberate "new intent"; disclosed in README limitations. |
+
+**Post-fix verification (2026-10-19T19:58:46-05:00):** `npm run check` exit 0 — API 114/114, web 37/37, lint, typecheck, builds.
