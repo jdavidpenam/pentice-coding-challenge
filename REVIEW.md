@@ -139,3 +139,8 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 | CW-L4 | Low | `theme.ts` | Theme did not follow live OS `prefers-color-scheme` changes. | Fixed: `followSystemTheme` listener applies OS changes until the viewer has a saved choice or a `?theme=` override. Not covered by an automated test (jsdom has no matchMedia; guarded). |
 
 **Post-fix verification (2026-10-19T21:03:08-05:00):** `npm run check` exit 0 — API 114/114, web 62/62, lint, typecheck, builds.
+
+### R-CW2 — Focused re-review of the R-CW fixes (stopped)
+
+- **Snapshot:** `3615d38` (diff vs `63a7c8f`) · **Requested:** 2026-10-19T21:03:29-05:00 · **Stopped by the candidate** before reporting (noted 2026-10-19T21:04:39-05:00). No findings were received.
+- **Status:** the CW-M1 and CW-L1 to CW-L4 fixes are **not independently re-reviewed**. Evidence so far is the implementer's own: `npm run check` exit 0 (API 114/114, web 62/62) and two mutation checks (CW-M1, CW-L1).
