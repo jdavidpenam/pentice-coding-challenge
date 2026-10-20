@@ -16,7 +16,7 @@ export function describePayment(payment: Payment): string {
     case 'SUCCEEDED':
       return `Paid ${formatMinor(payment.amountMinor)} for “${payment.reference}”.`;
     case 'FAILED':
-      return `Payment declined (${payment.failureReason}) Your funds were returned.`;
+      return `Payment declined. Provider said: ${payment.failureReason} Your funds were returned.`;
     case 'PENDING':
       return 'The provider did not confirm the payment. Your funds are held until it is resolved.';
   }

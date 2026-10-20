@@ -187,7 +187,9 @@ describe('App', () => {
     expect(api.posts().filter((c) => (c.body as { toAccountId: string }).toAccountId === ALICE_SAVINGS)).toEqual([]);
     await user.clear(form.getByLabelText(/Amount/));
 
+    // Switching back makes Savings a valid option again; a stale value would silently reappear as the recipient.
     await user.selectOptions(form.getByLabelText('From'), ALICE_MAIN);
+    expect(form.getByLabelText<HTMLSelectElement>('To').value).toBe('');
     await user.selectOptions(form.getByLabelText('To'), ALICE_SAVINGS);
     await user.type(form.getByLabelText(/Amount/), '12.5');
     await user.click(form.getByRole('button', { name: 'Send money' }));

@@ -70,3 +70,18 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 | L5 | Low | `PaymentForm.tsx` | Decline message said "Declined: Declined by…". | Fixed wording: "Payment declined (reason) Your funds were returned." |
 
 **Post-fix verification:** `npm run check` exit 0 — API 82/82, web 34/34, lint, typecheck, builds (2026-10-19T19:38:53-05:00).
+
+### R-B2 — Focused re-review of the R-B fixes
+
+- **Snapshot:** `e621c72` (diff against `571be04`) · **Reviewer context:** fresh general-purpose subagent, limited to R-B rows L1–L5, budget ≈6 min.
+- **Requested:** 2026-10-19T19:39:22-05:00 (00:39:22Z) · **Returned:** by 2026-10-19T19:40:41-05:00 (00:40:41Z) (first clock capture after; reported ≈60 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — L1, L2, L3, L5 fixes do what they claim; L4 acceptance reasoned; **no regressions**. It verified that App.tsx never shows another user's data after a switch or failed refresh (`${userId}:` key prefix, cancelled stale loads) and that a stale error clears on the next good load. Its `npm run check`: exit 0, API 82/82, web 34/34.
+- **Not performed by reviewer:** its own mutation test of the L2 test; a browser/live-API UI check; anything outside R-B.
+
+| ID | Sev | Finding | Resolution |
+|---|---|---|---|
+| RB2-1 | Low | **Correction to R-B row L2 and TIMELOG E12:** the claim that "no automated test can isolate" the stale-To fix is wrong. Switching From back to the original account makes the stale option valid again, so it reappears as the recipient. | Fixed: the test now asserts To is empty after switching back. **Mutation check run by the implementer:** with the fix removed, this test fails (1 failed / 33 passed); with it restored, 34/34. The earlier disclosure in R-B/E12 is superseded by this entry (append-only; the original rows are left as written). |
+| RB2-2 | Info | The L5 wording still repeated "declined". | Reworded: "Payment declined. Provider said: <reason> Your funds were returned." |
+
+**Post-fix verification (2026-10-19T19:40:41-05:00):** `npm run check` exit 0 — API 82/82, web 34/34, lint, typecheck, builds.
+**Milestone status:** A and B complete and reviewed. No unresolved Blocking/High/Medium findings. Accepted Low items: R-A F5 (adapter response validation deferred), R-B L4 (dev client code in prod bundle). Not covered: a real-browser and screen-reader pass.
