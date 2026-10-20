@@ -49,3 +49,24 @@ Reviewers run as separate subagents with a fresh context. They receive only thei
 | F4 | Low | `payments.service.ts` provider error | 201 + `PENDING` with funds held could be misread as paid. | UI shows "provider did not confirm… funds are held"; README states it. Resolution itself is bonus scope. |
 | F5 | Low | `payments.service.ts` settle default | A malformed real-adapter outcome → 500, payment stays PENDING (safe, untested). | Deferred: adapter-side validation noted in README for real providers. |
 | F6 | Low | tests | 401 tested on one endpoint only; decline against the alternative provider untested; third-party view of `GET /transfers` only indirect. | Fixed: `it.each` 401 test over every acting-user endpoint; alternative provider decline test. (Third-party transfers view is already asserted in the AC5 test via Carol.) S12 log content is not tested (disclosed). |
+
+---
+
+## R-B — Milestone B (frontend + complete core) review
+
+- **Snapshot:** `571be04` · **Reviewer context:** fresh general-purpose subagent (only responsibilities, repo path, doc paths, scope, SHA, deadline, ≈12 min budget). It worked on a `git archive` extract and did not modify the repo.
+- **Requested:** 2026-10-19T19:35:18-05:00 (00:35:18Z) · **Returned:** by 2026-10-19T19:37:26-05:00 (00:37:26Z) (first clock capture after the report; reported duration ≈ 128 s).
+- **Verdict:** **PASS WITH LIMITATIONS** — 0 Blocking/High/Medium, 5 Low.
+- **IDs checked:** PDF core bullets (PDF read directly), R1–R12, AC1–AC13, AC19, AC20, A2.1–A2.3, R-A F1–F6 resolutions.
+- **Reviewer's own checks:** `npm ci` + `npm run check` exit 0 (API 82/82, web 32/32). Live curl run of the snapshot API on port 3100 covering own and cross-user transfers, 0.29 → 29 cents, an unauthorized source (404), approved and declined payments with HOLD/RELEASE, isolation of reads, and strict-schema rejections. It also searched the production bundle for dev code. TIMELOG E07–E10 arithmetic consistent.
+- **Not performed by reviewer:** a real-browser or screen-reader pass, a phone-width check, its own mutation testing, a dependency audit, and running the UI against the snapshot API (the user's dev servers held ports 3000/5173 at the candidate's request).
+
+| ID | Sev | Location | Finding | Resolution |
+|---|---|---|---|---|
+| L1 | Low | `Activity.tsx` / `App.test.tsx` | No UI test that the Activity table shows FAILED payments as FAILED; no own-account transfer UI test; the UI tests use a fake API. | Fixed: the decline test now asserts the Activity row says FAILED (not SUCCEEDED); added an own-account transfer test (asserts the exact POST body in cents). The fake-API limitation is disclosed; the real UI↔API contract was checked by live smoke tests (TIMELOG E10). |
+| L2 | Low | `TransferForm.tsx` | Changing From to the selected To leaves stale `toAccountId` (submit then blocked by native `required`; API would reject same-account anyway). | Fixed: From `onChange` clears a matching To. Test added for "never sends same-account". **Note:** a mutation check showed this test also passes without the fix, because native `required` already blocks the submit. The fix is a UX clarity change no automated test can isolate (disclosed). |
+| L3 | Low | `App.tsx` | A failed refresh after a successful action replaced the whole dashboard. | Fixed: the last good data stays visible with a "Could not refresh… Showing the last loaded data." alert; test added. |
+| L4 | Low | web bundle | Dev-panel API client functions ship in the production bundle (the route doesn't exist in production). | Accepted, not changed: harmless dead code; the server-side gating is what protects it. Noted here. |
+| L5 | Low | `PaymentForm.tsx` | Decline message said "Declined: Declined by…". | Fixed wording: "Payment declined (reason) Your funds were returned." |
+
+**Post-fix verification:** `npm run check` exit 0 — API 82/82, web 34/34, lint, typecheck, builds (2026-10-19T19:38:53-05:00).

@@ -42,7 +42,14 @@ export function TransferForm({ userId, accounts, directory, onChanged }: Props) 
       <form onSubmit={send} className="stack">
         <label>
           From
-          <select value={fromAccountId} onChange={(e) => { setFrom(e.target.value); }} required>
+          <select
+            value={fromAccountId}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              if (e.target.value === toAccountId) setTo('');
+            }}
+            required
+          >
             <option value="">Choose an account…</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>

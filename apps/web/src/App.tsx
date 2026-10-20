@@ -26,14 +26,20 @@ export function App() {
     return () => { cancelled = true; };
   }, [usersKey]);
 
-  const [dashboard, setDashboard] = useState<Loaded<Dashboard>>();
+  // `data` is the last good load for this user; `error` is set when the latest load failed.
+  const [dashboard, setDashboard] = useState<{ key: string; data?: Dashboard; error?: string }>();
   const dashboardKey = `${userId}:${version}`;
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     loadDashboard(userId).then(
       (data) => { if (!cancelled) setDashboard({ key: dashboardKey, data }); },
-      (e: unknown) => { if (!cancelled) setDashboard({ key: dashboardKey, error: describeError(e) }); },
+      (e: unknown) => {
+        if (cancelled) return;
+        const error = describeError(e);
+        // A failed refresh keeps the last good data for the same user visible, with the error shown above it.
+        setDashboard((prev) => (prev?.data && prev.key.startsWith(`${userId}:`) ? { key: dashboardKey, data: prev.data, error } : { key: dashboardKey, error }));
+      },
     );
     return () => { cancelled = true; };
   }, [userId, dashboardKey]);
@@ -63,10 +69,15 @@ export function App() {
           <p className="card">Choose a demo user to see their accounts.</p>
         ) : !current ? (
           <p className="card" role="status">Loading…</p>
-        ) : 'error' in current ? (
+        ) : !current.data ? (
           <p className="card status error" role="alert">{current.error}</p>
         ) : (
           <div className="grid" aria-busy={refreshing}>
+            {current.error && (
+              <p className="card wide status error" role="alert">
+                Could not refresh: {current.error} Showing the last loaded data.
+              </p>
+            )}
             <Accounts userId={userId} accounts={current.data.accounts} onChanged={refresh} />
             <TransferForm userId={userId} accounts={current.data.accounts} directory={current.data.directory} onChanged={refresh} />
             <PaymentForm userId={userId} accounts={current.data.accounts} onChanged={refresh} />
