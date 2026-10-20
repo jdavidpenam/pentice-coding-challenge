@@ -1,0 +1,10 @@
+.prow { display: grid; gap: var(--space-3); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+.prow__main { display: flex; justify-content: space-between; gap: var(--space-3); }
+.prow__info { display: grid; min-width: 0; }
+.prow__ref { font-weight: 700; overflow-wrap: anywhere; }
+.prow__meta { font-size: 12.5px; color: var(--ink-2); }
+.prow__side { display: grid; justify-items: end; gap: 6px; flex: none; }
+.prow__amount { font-weight: 700; }
+.prow > .btn { justify-self: start; }
+.prow__result { background: var(--tone-bg); border-radius: var(--radius-md); padding: 10px 12px; font-size: var(--fs-meta); }
+.prow__result strong { color: var(--tone-fg); }

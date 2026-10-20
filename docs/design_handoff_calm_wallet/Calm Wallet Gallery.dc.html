@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><style>body{margin:0;background:#ecebe7;font-family:system-ui,-apple-system,sans-serif;color:#1a1a1a}a{color:#2a5bd7}a:hover{color:#1a3f9e}.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}.dv-tname{font:600 13px/1.2 system-ui,sans-serif;color:#1a1a1a}.dv-opts{display:flex;flex-direction:column;gap:56px;align-items:flex-start}.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}.dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 11px/1.3 system-ui,sans-serif;color:rgba(0,0,0,.55)}.dv-opt:target .dv-oid{background:#2a78d6;color:#fff}.dv-next{margin:28px 0 0;font:12px/1.5 system-ui,sans-serif;color:rgba(0,0,0,.55)}</style></helmet>
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Transactions App — Calm wallet (chosen direction)</span></div>
+
+<div style="max-width:1100px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin:0 0 40px;font-size:13.5px;line-height:1.55">
+<div><div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin-bottom:6px">WHAT THIS IS</div><p style="margin:0;text-wrap:pretty">Every frame is the same working React-style prototype, preset to a state. Click around — transfers, payments, Check status, user switching, the dev panel all work. Copy is real, not lorem.</p></div>
+<div><div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin-bottom:6px">SHARED RULES (BOTH)</div><p style="margin:0;text-wrap:pretty">Reserved always uses a <strong>hatched</strong> pattern + the word “Reserved”, never colour alone. Status badges carry a glyph and a word. Every input has a visible label; errors sit under the field with “!” and aria-describedby. Buttons disable while a request is in flight. Tabular figures everywhere.</p></div>
+<div><div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin-bottom:6px">IMPLEMENTATION</div><p style="margin:0;text-wrap:pretty">Plain CSS: custom properties for tokens, flex/grid, one breakpoint at 700px and one at 1100px. No animation beyond what CSS transitions give you. Status-check results are stored on the payment record, so they survive the row re-rendering.</p></div>
+</div>
+
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Calm wallet — cards, bottom tabs, review-before-send sheet · Figtree</div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,300px));gap:20px;margin:6px 0 22px;font-size:13px;line-height:1.55">
+<div><strong style="display:block;margin-bottom:4px">Fewer money mistakes</strong>A separate Review sheet before anything moves: amount shown huge, From/To spelled out, and “Main after” balance. Inline warning when the amount exceeds Available, before review.</div>
+<div><strong style="display:block;margin-bottom:4px">Reserved vs available</strong>One headline number: <em>Available to spend</em>. Reserved sits beside it as a hatched segment of the bar and a labelled line on each card, plus one plain sentence explaining it.</div>
+<div><strong style="display:block;margin-bottom:4px">Unconfirmed payments</strong>A “2 payments not confirmed yet” card on Home links to them. Results say what we know and don't (“we don't know yet if it charged — not lost”) and that retrying won't double-charge.</div>
+<div><strong style="display:block;margin-bottom:4px">Demo identity</strong>The user chip in the header reads “Demo user · Alice”. Tapping it opens the switcher, with the full notice at the top. The notice is also repeated in the Home footer.</div>
+</div>
+<div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin:0 0 10px">PHONE · 375 · LIGHT</div>
+<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:nowrap">
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="none" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Home · accounts overview</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="transfer-invalid" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Transfer · validation error</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="transfer-review" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Transfer · review sheet (press Send → Sending… disabled)</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="transfer-success" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Transfer · success</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="pay-unconfirmed" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Pay · Unconfirmed (charge, then lose the response)</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="activity-payments" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Activity · payments, check results kept</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="light" width="375" height="812" preset="user" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Demo user switcher + add user</figcaption></figure>
+</div>
+<div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin:36px 0 10px">PHONE · 375 · DARK</div>
+<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:nowrap">
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="refresh-error" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Home · refresh failed banner</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="transfer-funds" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Transfer · not enough available funds</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="pay" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Pay for a room · idle</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="activity-history" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Activity · account history</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="dev" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Dev panel · bottom sheet</figcaption></figure>
+<figure style="margin:0;display:flex;flex-direction:column;gap:8px"><div style="border-radius:32px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:375px;height:812px"><dc-import name="CalmWallet" theme="dark" width="375" height="812" preset="open" hint-size="375px,812px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:8px">Open account sheet</figcaption></figure>
+</div>
+<div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin:36px 0 10px">TABLET · 768 · LIGHT — top segmented nav, 2-col cards, sheets become centred dialogs  ·  DESKTOP · 1280 — sidebar nav, 3-col cards, table history</div>
+<div style="display:flex;gap:32px;align-items:flex-start;flex-wrap:nowrap">
+<figure style="margin:0"><div style="border-radius:20px;overflow:hidden;box-shadow:0 0 0 8px #1b1d1c,0 20px 40px rgba(0,0,0,.18);width:768px;height:1024px"><dc-import name="CalmWallet" theme="light" width="768" height="1024" preset="none" hint-size="768px,1024px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:14px">Tablet · Home</figcaption></figure>
+<div style="display:flex;flex-direction:column;gap:32px">
+<figure style="margin:0"><div style="border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 20px 40px rgba(0,0,0,.15);width:1280px;height:800px"><dc-import name="CalmWallet" theme="light" width="1280" height="800" preset="activity-history" hint-size="1280px,800px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:10px">Desktop · light · account history table</figcaption></figure>
+<figure style="margin:0"><div style="border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 20px 40px rgba(0,0,0,.15);width:1280px;height:800px"><dc-import name="CalmWallet" theme="dark" width="1280" height="800" preset="transfer-review" hint-size="1280px,800px"></dc-import></div><figcaption style="font-size:12px;color:rgba(0,0,0,.6);margin-top:10px">Desktop · dark · review as centred dialog</figcaption></figure>
+</div>
+</div>
+<div style="font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.06em;color:rgba(0,0,0,.5);margin:36px 0 10px">TOKENS &amp; COMPONENTS</div>
+<div style="display:flex;gap:24px;align-items:flex-start">
+<div style="border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.1)"><dc-import name="CalmWallet" view="kit" theme="light" width="720" hint-size="720px,900px"></dc-import></div>
+<div style="border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,.1)"><dc-import name="CalmWallet" view="kit" theme="dark" width="720" hint-size="720px,900px"></dc-import></div>
+</div>
+</div>
+
+</div>
+
+</section>
+</x-dc>
+</body>
+</html>

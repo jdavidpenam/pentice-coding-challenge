@@ -1,0 +1,4 @@
+.banner { display: flex; gap: var(--space-3); align-items: flex-start; background: var(--tone-bg); color: var(--ink); border-radius: var(--radius-field); padding: var(--space-3) var(--space-4); font-size: 14px; }
+.banner__glyph { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--tone-fg); color: var(--tone-bg); display: grid; place-items: center; font-size: 12px; font-weight: 800; margin-top: 1px; }
+.banner__body { flex: 1; min-width: 0; }
+.banner__body strong { color: var(--tone-fg); }

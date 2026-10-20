@@ -1,0 +1,4 @@
+.amount { position: relative; }
+.amount__currency { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); font-size: 26px; font-weight: 700; color: var(--ink-2); }
+.amount__input { width: 100%; min-height: var(--amount-h); border-radius: var(--radius-lg); border: 2px solid var(--line-strong); background: var(--field); padding: 0 var(--space-4) 0 40px; font-size: var(--fs-amount); font-weight: 700; font-variant-numeric: tabular-nums; }
+.amount__input[aria-invalid='true'] { border-color: var(--danger-fg); }

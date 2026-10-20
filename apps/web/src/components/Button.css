@@ -1,0 +1,8 @@
+.btn { min-height: var(--touch); border-radius: var(--radius-md); font-weight: 600; font-size: var(--fs-label); padding: 0 var(--space-4); border: 1.5px solid transparent; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.btn--primary { min-height: var(--btn-h); border-radius: var(--radius-lg); background: var(--accent); color: var(--on-accent); font-size: 16px; font-weight: 700; border: none; }
+.btn--secondary { background: var(--surface); color: var(--ink); border-color: var(--line-strong); }
+.btn--ink { background: var(--ink); color: var(--bg); }
+.btn--text { background: transparent; color: var(--accent-ink); text-decoration: underline; padding: 0 var(--space-2); }
+.btn--block { width: 100%; }
+.btn:disabled { background: var(--disabled-bg); color: var(--disabled-fg); border-color: transparent; cursor: not-allowed; }
+.btn--text:disabled { background: transparent; }

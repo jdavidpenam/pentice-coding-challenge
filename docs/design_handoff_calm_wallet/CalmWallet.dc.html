@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"></helmet>
+<sc-if value="{{ isApp }}" hint-placeholder-val="{{ true }}">
+<div style="position:relative;overflow:hidden;width:{{ L.w }};height:{{ L.h }};display:flex;flex-direction:{{ L.dir }};background:{{ t.bg }};color:{{ t.ink }};font-family:Figtree,system-ui,sans-serif;font-size:15px;line-height:1.45;font-variant-numeric:tabular-nums;text-align:left;color-scheme:{{ scheme }}">
+
+<sc-if value="{{ isDesktop }}">
+<nav aria-label="Main" style="width:248px;flex:none;display:flex;flex-direction:column;gap:4px;padding:24px 16px;background:{{ t.surface }};border-right:1px solid {{ t.line }}">
+<div style="display:flex;align-items:center;gap:10px;padding:0 10px 20px"><span aria-hidden="true" style="width:28px;height:28px;border-radius:9px;background:{{ t.accent }}"></span><span style="font-weight:700;font-size:17px">Transactions</span></div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="4">
+<button type="button" onClick="{{ n.go }}" aria-current="{{ n.cur }}" style="min-height:48px;display:flex;align-items:center;gap:12px;padding:0 14px;border:0;border-radius:14px;background:{{ n.bg }};color:{{ n.fg }};font:600 15px Figtree,system-ui,sans-serif;text-align:left;cursor:pointer"><span aria-hidden="true" style="width:13px;height:13px;border:2px solid currentColor;border-radius:{{ n.ir }};transform:{{ n.tf }}"></span>{{ n.label }}</button>
+</sc-for>
+<div style="flex:1"></div>
+<button type="button" onClick="{{ openDev }}" style="min-height:44px;padding:0 14px;border-radius:12px;border:1.5px dashed {{ t.lineStrong }};background:transparent;color:{{ t.ink2 }};font:600 13px Figtree,system-ui,sans-serif;text-align:left;cursor:pointer">Simulated provider (dev only)</button>
+<p style="margin:12px 4px 0;font-size:12px;line-height:1.45;color:{{ t.ink2 }}">{{ notice }}</p>
+</nav>
+</sc-if>
+
+<div style="flex:1;min-width:0;min-height:0;display:flex;flex-direction:column">
+<header style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:{{ L.headPad }}">
+<h1 style="margin:0;font-size:{{ L.titleSize }};font-weight:700;letter-spacing:-.01em;line-height:1.15">{{ pageTitle }}</h1>
+<button type="button" onClick="{{ openUser }}" aria-label="{{ meAria }}" style="min-height:44px;display:flex;align-items:center;gap:8px;padding:4px 12px 4px 4px;border-radius:999px;border:1px solid {{ t.line }};background:{{ t.surface }};color:{{ t.ink }};font-family:inherit;cursor:pointer">
+<span aria-hidden="true" style="width:36px;height:36px;border-radius:50%;background:{{ t.accentSoft }};color:{{ t.accentInk }};display:grid;place-items:center;font-weight:700;font-size:15px">{{ meInitial }}</span>
+<span style="display:flex;flex-direction:column;align-items:flex-start;line-height:1.15"><span style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:{{ t.warnFg }}">Demo user</span><span style="font-weight:600;font-size:15px">{{ meName }}</span></span>
+<span aria-hidden="true" style="font-size:11px;color:{{ t.ink2 }};margin-left:2px">▼</span>
+</button>
+</header>
+
+<sc-if value="{{ isTablet }}">
+<nav aria-label="Main" style="flex:none;padding:0 28px 12px"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:16px;background:{{ t.surface2 }};max-width:680px;margin:0 auto">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="4"><button type="button" onClick="{{ n.go }}" aria-current="{{ n.cur }}" style="min-height:44px;border:0;border-radius:12px;background:{{ n.segBg }};color:{{ n.segFg }};box-shadow:{{ n.segSh }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ n.label }}</button></sc-for>
+</div></nav>
+</sc-if>
+
+<sc-if value="{{ refreshErr }}">
+<div role="status" style="flex:none;margin:{{ L.bannerMargin }};display:flex;align-items:center;gap:12px;padding:6px 6px 6px 14px;border-radius:14px;background:{{ t.warnBg }};color:{{ t.ink }};font-size:14px;font-weight:500">
+<span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;border:2px solid {{ t.warnFg }};color:{{ t.warnFg }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span>
+<span style="flex:1">Could not refresh — showing last loaded data.</span>
+<button type="button" onClick="{{ doRefresh }}" style="min-height:44px;padding:0 14px;border-radius:10px;border:0;background:transparent;color:{{ t.warnFg }};font:700 14px Figtree,system-ui,sans-serif;text-decoration:underline;cursor:pointer">Retry</button>
+</div>
+</sc-if>
+
+<main style="flex:1;min-height:0;overflow-y:auto;padding:{{ L.pad }}"><div style="max-width:{{ L.maxW }};margin:0 auto;display:flex;flex-direction:column;gap:18px">
+
+<sc-if value="{{ tabAccounts }}" hint-placeholder-val="{{ true }}">
+<section aria-label="Balance summary" style="background:{{ t.surface }};border:1px solid {{ t.line }};box-shadow:{{ t.shadow }};border-radius:24px;padding:22px;display:flex;flex-direction:column;gap:14px">
+<div style="font-size:13px;font-weight:600;color:{{ t.ink2 }}">Available to spend · all accounts</div>
+<div style="display:flex;align-items:baseline;font-weight:700;letter-spacing:-.025em;line-height:1"><span style="font-size:{{ L.big }}">{{ totMain }}</span><span style="font-size:{{ L.bigCents }};color:{{ t.ink2 }}">{{ totCents }}</span></div>
+<div aria-hidden="true" style="display:flex;height:10px;border-radius:99px;overflow:hidden;background:{{ t.surface2 }}"><div style="width:{{ barAvail }};background:{{ t.accent }}"></div><div style="width:{{ barRes }};background-image:{{ hatch }};border-left:2px solid {{ t.surface }}"></div></div>
+<div style="display:flex;flex-wrap:wrap;gap:8px 20px;font-size:14px">
+<span style="display:flex;align-items:center;gap:8px"><span aria-hidden="true" style="width:12px;height:12px;border-radius:4px;background:{{ t.accent }}"></span>Available <strong style="font-weight:700">{{ totAvail }}</strong></span>
+<span style="display:flex;align-items:center;gap:8px;color:{{ t.warnFg }}"><span aria-hidden="true" style="width:12px;height:12px;border-radius:4px;background-image:{{ hatch }};outline:1px solid {{ t.warnFg }}"></span>Reserved <strong style="font-weight:700">{{ totRes }}</strong></span>
+</div>
+<p style="margin:0;font-size:13.5px;color:{{ t.ink2 }};text-wrap:pretty">Reserved is held for hotel payments the provider hasn't confirmed. You can't spend it until it's paid or released.</p>
+</section>
+
+<sc-if value="{{ hasPending }}">
+<div style="display:flex;align-items:center;gap:12px;padding:12px 12px 12px 16px;border-radius:18px;background:{{ t.warnBg }}">
+<span aria-hidden="true" style="flex:none;width:30px;height:30px;border-radius:50%;border:2px solid {{ t.warnFg }};color:{{ t.warnFg }};display:grid;place-items:center;font-weight:800">?</span>
+<div style="flex:1;font-size:14px;line-height:1.35"><strong style="display:block">{{ pendingTitle }}</strong><span style="color:{{ t.ink2 }}">Waiting on the provider · {{ pendingAmt }} reserved</span></div>
+<button type="button" onClick="{{ goPayments }}" style="min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid {{ t.warnFg }};background:transparent;color:{{ t.warnFg }};font:700 14px Figtree,system-ui,sans-serif;cursor:pointer">Review</button>
+</div>
+</sc-if>
+
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:4px">
+<h2 style="margin:0;font-size:17px;font-weight:700">Your accounts</h2>
+<button type="button" onClick="{{ openAcctSheet }}" style="min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid {{ t.lineStrong }};background:{{ t.surface }};color:{{ t.ink }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">+ Open account</button>
+</div>
+<div style="display:grid;grid-template-columns:{{ L.cardCols }};gap:12px">
+<sc-for list="{{ cards }}" as="a" hint-placeholder-count="3">
+<button type="button" onClick="{{ a.open }}" aria-label="{{ a.aria }}" style="text-align:left;padding:18px;border-radius:20px;border:1px solid {{ t.line }};background:{{ t.surface }};box-shadow:{{ t.shadow }};color:{{ t.ink }};display:flex;flex-direction:column;gap:12px;font-family:inherit;font-variant-numeric:tabular-nums;cursor:pointer">
+<span style="display:flex;justify-content:space-between;align-items:center;width:100%"><span style="font-weight:700;font-size:16px">{{ a.name }}</span><span style="font-size:13px;font-weight:600;color:{{ t.accentInk }}">History ›</span></span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:600;color:{{ t.ink2 }}">Available</span><span style="font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.1">{{ a.avail }}</span></span>
+<span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:{{ a.resFg }}"><span aria-hidden="true" style="width:12px;height:12px;border-radius:4px;background-image:{{ a.swatch }};outline:1px solid {{ a.resFg }}"></span>{{ a.resText }}</span>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{ notDesktop }}">
+<div style="display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-radius:16px;border:1.5px dashed {{ t.lineStrong }}">
+<p style="margin:0;font-size:13px;color:{{ t.ink2 }};text-wrap:pretty"><strong style="color:{{ t.ink }}">Demo only</strong> — picking a user is not authentication; payments use a simulated provider, no real money moves.</p>
+<button type="button" onClick="{{ openDev }}" style="align-self:flex-start;min-height:44px;padding:0 14px;border-radius:12px;border:1px solid {{ t.line }};background:{{ t.surface2 }};color:{{ t.ink2 }};font:600 13px Figtree,system-ui,sans-serif;cursor:pointer">Simulated provider (dev only)</button>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ tabTransfer }}">
+<form onSubmit="{{ xferSubmit }}" noValidate="{{ true }}" style="width:100%;max-width:560px;margin:0 auto;box-sizing:border-box;background:{{ t.surface }};border:1px solid {{ t.line }};box-shadow:{{ t.shadow }};border-radius:24px;padding:22px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="{{ ids.from }}" style="font-weight:700;font-size:14px">From</label>
+<div style="position:relative"><select id="{{ ids.from }}" value="{{ xf.from }}" onChange="{{ setXFrom }}" style="width:100%;appearance:none;min-height:52px;padding:0 40px 0 14px;border-radius:14px;border:1.5px solid {{ t.lineStrong }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }};border-color:{{ t.accent }}"><sc-for list="{{ fromOpts }}" as="o"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select><span aria-hidden="true" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:11px;color:{{ t.ink2 }};pointer-events:none">▼</span></div>
+<div style="font-size:13px;color:{{ t.ink2 }}">{{ xf.fromHint }}</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<span id="{{ ids.toLbl }}" style="font-weight:700;font-size:14px">To</span>
+<div role="radiogroup" aria-labelledby="{{ ids.toLbl }}" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:14px;background:{{ t.surface2 }}">
+<sc-for list="{{ toModes }}" as="m"><button type="button" role="radio" aria-checked="{{ m.sel }}" onClick="{{ m.pick }}" style="min-height:44px;border:0;border-radius:11px;background:{{ m.bg }};color:{{ m.fg }};box-shadow:{{ m.sh }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ m.label }}</button></sc-for>
+</div>
+<sc-if value="{{ xf.hasTo }}">
+<label for="{{ ids.to }}" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Destination account</label>
+<div style="position:relative"><select id="{{ ids.to }}" value="{{ xf.to }}" onChange="{{ setXTo }}" style="width:100%;appearance:none;min-height:52px;padding:0 40px 0 14px;border-radius:14px;border:1.5px solid {{ t.lineStrong }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }};border-color:{{ t.accent }}"><sc-for list="{{ toOpts }}" as="o"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select><span aria-hidden="true" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:11px;color:{{ t.ink2 }};pointer-events:none">▼</span></div>
+<div style="font-size:13px;color:{{ t.ink2 }}">{{ xf.toHint }}</div>
+</sc-if>
+<sc-if value="{{ xf.noTo }}"><div style="font-size:14px;padding:12px 14px;border-radius:12px;background:{{ t.infoBg }};color:{{ t.ink }}">You have no other accounts yet. Open one, or send to another person.</div></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="{{ ids.amt }}" style="font-weight:700;font-size:14px">Amount (USD)</label>
+<div style="position:relative"><span aria-hidden="true" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:700;color:{{ t.ink2 }}">$</span><input id="{{ ids.amt }}" inputMode="decimal" autoComplete="off" placeholder="0.00" value="{{ xf.amount }}" onChange="{{ setXAmt }}" onBlur="{{ touchX }}" aria-invalid="{{ xf.invalid }}" aria-describedby="{{ ids.amtHelp }}" style="width:100%;box-sizing:border-box;min-height:64px;padding:0 14px 0 40px;border-radius:16px;border:2px solid {{ xf.amtBd }};background:{{ t.field }};color:{{ t.ink }};font:700 28px Figtree,system-ui,sans-serif;font-variant-numeric:tabular-nums" style-focus="outline:3px solid {{ t.ring }};outline-offset:1px"></div>
+<div id="{{ ids.amtHelp }}" style="display:flex;align-items:flex-start;gap:8px;font-size:13.5px;font-weight:{{ xf.helpW }};color:{{ xf.helpFg }}"><sc-if value="{{ xf.showErr }}"><span aria-hidden="true" style="flex:none;margin-top:1px;width:16px;height:16px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span></sc-if><span>{{ xf.help }}</span></div>
+</div>
+<button type="submit" style="min-height:54px;border:0;border-radius:16px;background:{{ t.accent }};color:{{ t.onAccent }};font:700 16px Figtree,system-ui,sans-serif;cursor:pointer" style-focus="outline:3px solid {{ t.ring }};outline-offset:2px">Review transfer</button>
+<p style="margin:-6px 0 0;font-size:12.5px;color:{{ t.ink2 }};text-align:center">Nothing moves until you confirm on the next step.</p>
+</form>
+</sc-if>
+
+<sc-if value="{{ tabPay }}">
+<form onSubmit="{{ paySubmit }}" noValidate="{{ true }}" style="width:100%;max-width:560px;margin:0 auto;box-sizing:border-box;background:{{ t.surface }};border:1px solid {{ t.line }};box-shadow:{{ t.shadow }};border-radius:24px;padding:22px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="{{ ids.pFrom }}" style="font-weight:700;font-size:14px">Pay from</label>
+<div style="position:relative"><select id="{{ ids.pFrom }}" value="{{ pf.from }}" onChange="{{ setPFrom }}" style="width:100%;appearance:none;min-height:52px;padding:0 40px 0 14px;border-radius:14px;border:1.5px solid {{ t.lineStrong }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }};border-color:{{ t.accent }}"><sc-for list="{{ fromOpts }}" as="o"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select><span aria-hidden="true" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:11px;color:{{ t.ink2 }};pointer-events:none">▼</span></div>
+<div style="font-size:13px;color:{{ t.ink2 }}">{{ pf.fromHint }}</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="{{ ids.pRef }}" style="font-weight:700;font-size:14px">Booking reference</label>
+<input id="{{ ids.pRef }}" autoComplete="off" placeholder="Room 204 #BK-1029" value="{{ pf.ref }}" onChange="{{ setPRef }}" aria-invalid="{{ pf.refInvalid }}" aria-describedby="{{ ids.pRefHelp }}" style="width:100%;box-sizing:border-box;min-height:52px;padding:0 14px;border-radius:14px;border:1.5px solid {{ pf.refBd }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }};border-color:{{ t.accent }}">
+<sc-if value="{{ pf.refInvalid }}"><div id="{{ ids.pRefHelp }}" style="display:flex;gap:8px;font-size:13.5px;font-weight:600;color:{{ t.dangerFg }}"><span aria-hidden="true" style="flex:none;margin-top:1px;width:16px;height:16px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span>Enter the booking reference from your hotel.</div></sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<label for="{{ ids.pAmt }}" style="font-weight:700;font-size:14px">Amount (USD)</label>
+<div style="position:relative"><span aria-hidden="true" style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:700;color:{{ t.ink2 }}">$</span><input id="{{ ids.pAmt }}" inputMode="decimal" autoComplete="off" placeholder="0.00" value="{{ pf.amount }}" onChange="{{ setPAmt }}" aria-invalid="{{ pf.invalid }}" aria-describedby="{{ ids.pAmtHelp }}" style="width:100%;box-sizing:border-box;min-height:64px;padding:0 14px 0 40px;border-radius:16px;border:2px solid {{ pf.amtBd }};background:{{ t.field }};color:{{ t.ink }};font:700 28px Figtree,system-ui,sans-serif;font-variant-numeric:tabular-nums" style-focus="outline:3px solid {{ t.ring }};outline-offset:1px"></div>
+<div id="{{ ids.pAmtHelp }}" style="display:flex;gap:8px;font-size:13.5px;font-weight:{{ pf.helpW }};color:{{ pf.helpFg }}"><sc-if value="{{ pf.showErr }}"><span aria-hidden="true" style="flex:none;margin-top:1px;width:16px;height:16px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span></sc-if><span>{{ pf.help }}</span></div>
+</div>
+<sc-if value="{{ pf.hasServerErr }}"><div role="alert" style="display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:{{ t.dangerBg }};color:{{ t.ink }};font-size:14px"><span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span>{{ pf.serverErr }}</div></sc-if>
+<button type="submit" disabled="{{ pf.sending }}" style="min-height:54px;border:0;border-radius:16px;background:{{ pf.btnBg }};color:{{ pf.btnFg }};font:700 16px Figtree,system-ui,sans-serif;cursor:pointer" style-focus="outline:3px solid {{ t.ring }};outline-offset:2px">{{ pf.btn }}</button>
+<p style="margin:-6px 0 0;font-size:12.5px;color:{{ t.ink2 }};text-align:center;text-wrap:pretty">No card details needed — paid from your wallet through a simulated provider.</p>
+</form>
+<sc-if value="{{ hasPayRes }}">
+<section role="status" aria-live="polite" style="width:100%;max-width:560px;margin:0 auto;box-sizing:border-box;border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:12px;background:{{ pr.bg }};border:1.5px solid {{ pr.fg }}">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px 0 6px;border-radius:999px;background:{{ t.surface }};color:{{ pr.fg }};font-size:13px;font-weight:700"><span aria-hidden="true" style="width:18px;height:18px;border-radius:50%;background:{{ pr.fg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px">{{ pr.glyph }}</span>{{ pr.label }}</span><span style="font-size:22px;font-weight:700">{{ pr.amt }}</span></div>
+<div style="font-weight:700;font-size:16px">{{ pr.ref }}</div>
+<p style="margin:0;font-size:14px;color:{{ t.ink }};text-wrap:pretty">{{ pr.body }}</p>
+<sc-if value="{{ pr.dup }}"><p style="margin:0;font-size:13px;color:{{ t.ink2 }}">You already had this payment in progress, so we checked its status instead of charging again.</p></sc-if>
+<sc-if value="{{ pr.hasCheck }}"><p style="margin:0;font-size:13px;font-weight:600;color:{{ t.ink }}">{{ pr.checkText }}</p></sc-if>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-if value="{{ pr.pending }}"><button type="button" onClick="{{ pr.onCheck }}" disabled="{{ pr.checking }}" style="min-height:44px;padding:0 16px;border-radius:12px;border:0;background:{{ t.ink }};color:{{ t.bg }};font:700 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ pr.checkBtn }}</button></sc-if>
+<button type="button" onClick="{{ goPayments }}" style="min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid {{ t.lineStrong }};background:{{ t.surface }};color:{{ t.ink }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">All payments</button>
+</div>
+</section>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ tabActivity }}">
+<div role="tablist" aria-label="Activity type" style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:14px;background:{{ t.surface2 }}">
+<sc-for list="{{ actTabs }}" as="m"><button type="button" role="tab" aria-selected="{{ m.sel }}" onClick="{{ m.pick }}" style="min-height:44px;border:0;border-radius:11px;background:{{ m.bg }};color:{{ m.fg }};box-shadow:{{ m.sh }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ m.label }}</button></sc-for>
+</div>
+
+<sc-if value="{{ actHistory }}">
+<div role="radiogroup" aria-label="Account" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px">
+<sc-for list="{{ histChips }}" as="c"><button type="button" role="radio" aria-checked="{{ c.sel }}" onClick="{{ c.pick }}" style="flex:none;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid {{ c.bd }};background:{{ c.bg }};color:{{ c.fg }};font:600 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ c.name }}</button></sc-for>
+</div>
+<div style="background:{{ t.surface }};border:1px solid {{ t.line }};border-radius:20px;padding:4px 18px">
+<sc-if value="{{ isWide }}">
+<div aria-hidden="true" style="display:grid;grid-template-columns:130px minmax(0,1.6fr) 1fr 1fr 1fr;gap:12px;padding:12px 0;border-bottom:1px solid {{ t.line }};font-size:12px;font-weight:700;color:{{ t.ink2 }};text-transform:uppercase;letter-spacing:.05em"><span>Date</span><span>Type</span><span style="text-align:right">Available</span><span style="text-align:right">Reserved</span><span style="text-align:right">Available after</span></div>
+<sc-for list="{{ histRows }}" as="h"><div style="display:grid;grid-template-columns:130px minmax(0,1.6fr) 1fr 1fr 1fr;gap:12px;align-items:center;min-height:56px;padding:8px 0;border-bottom:1px solid {{ t.line }};font-size:14px"><span style="color:{{ t.ink2 }}">{{ h.at }}</span><span><strong style="font-weight:600;display:block">{{ h.type }}</strong><span style="font-size:12.5px;color:{{ t.ink2 }}">{{ h.note }}</span></span><span style="text-align:right;font-weight:700;color:{{ h.aFg }}">{{ h.dA }}</span><span style="text-align:right;font-weight:600;color:{{ h.rFg }}">{{ h.dR }}</span><span style="text-align:right">{{ h.after }}</span></div></sc-for>
+</sc-if>
+<sc-if value="{{ isPhone }}">
+<sc-for list="{{ histRows }}" as="h"><div style="display:flex;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid {{ t.line }}"><div style="min-width:0"><div style="font-weight:600">{{ h.type }}</div><div style="font-size:12.5px;color:{{ t.ink2 }}">{{ h.at }}</div><div style="font-size:12.5px;color:{{ t.ink2 }}">{{ h.note }}</div></div><div style="text-align:right;flex:none"><div style="font-weight:700;color:{{ h.aFg }}">{{ h.dA }}</div><sc-if value="{{ h.hasR }}"><div style="font-size:12.5px;font-weight:600;color:{{ t.warnFg }}">Reserved {{ h.dR }}</div></sc-if><div style="font-size:12.5px;color:{{ t.ink2 }}">After {{ h.after }}</div></div></div></sc-for>
+</sc-if>
+<sc-if value="{{ histEmpty }}"><p style="margin:0;padding:20px 0;color:{{ t.ink2 }}">No activity yet.</p></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ actTransfers }}">
+<div style="background:{{ t.surface }};border:1px solid {{ t.line }};border-radius:20px;padding:4px 18px">
+<sc-for list="{{ xferRows }}" as="r"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:64px;padding:10px 0;border-bottom:1px solid {{ t.line }}"><div style="min-width:0"><div style="font-weight:600">{{ r.from }} <span aria-hidden="true" style="color:{{ t.ink2 }}">→</span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> to </span> {{ r.to }}</div><div style="font-size:12.5px;color:{{ t.ink2 }}">{{ r.kind }} · {{ r.at }}</div></div><div style="flex:none;font-weight:700;color:{{ r.fg }}">{{ r.amt }}</div></div></sc-for>
+<sc-if value="{{ xferEmpty }}"><p style="margin:0;padding:20px 0;color:{{ t.ink2 }}">No transfers yet.</p></sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ actPayments }}">
+<div style="display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ payRows }}" as="r"><div style="background:{{ t.surface }};border:1px solid {{ t.line }};border-radius:18px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><div style="font-weight:700">{{ r.ref }}</div><div style="font-size:12.5px;color:{{ t.ink2 }}">{{ r.acct }} · {{ r.at }}</div></div><div style="flex:none;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span style="font-weight:700">{{ r.amt }}</span><span style="display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px 0 5px;border-radius:999px;background:{{ r.bg }};color:{{ r.fg }};font-size:12.5px;font-weight:700"><span aria-hidden="true" style="width:15px;height:15px;border-radius:50%;background:{{ r.fg }};color:{{ r.bg }};display:grid;place-items:center;font-size:10px">{{ r.glyph }}</span>{{ r.label }}</span></div></div>
+<sc-if value="{{ r.hasCheck }}"><div role="status" style="font-size:13px;padding:8px 10px;border-radius:10px;background:{{ r.cBg }};color:{{ t.ink }}"><strong>Checked {{ r.cAt }}</strong> — {{ r.cText }}</div></sc-if>
+<sc-if value="{{ r.pending }}"><button type="button" onClick="{{ r.onCheck }}" disabled="{{ r.checking }}" style="align-self:flex-start;min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid {{ t.lineStrong }};background:{{ t.surface }};color:{{ t.ink }};font:700 14px Figtree,system-ui,sans-serif;cursor:pointer">{{ r.checkBtn }}</button></sc-if>
+</div></sc-for>
+<sc-if value="{{ payEmpty }}"><p style="margin:0;padding:20px;color:{{ t.ink2 }}">No payments yet.</p></sc-if>
+</div>
+</sc-if>
+</sc-if>
+
+</div></main>
+
+<sc-if value="{{ isPhone }}">
+<nav aria-label="Main" style="flex:none;display:grid;grid-template-columns:repeat(4,1fr);padding:6px 8px 20px;background:{{ t.surface }};border-top:1px solid {{ t.line }}">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="4"><button type="button" onClick="{{ n.go }}" aria-current="{{ n.cur }}" style="min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:0;background:transparent;color:{{ n.tabFg }};font:600 12px Figtree,system-ui,sans-serif;cursor:pointer"><span aria-hidden="true" style="width:44px;height:28px;display:grid;place-items:center;border-radius:999px;background:{{ n.pill }}"><span style="width:12px;height:12px;border:2px solid currentColor;border-radius:{{ n.ir }};transform:{{ n.tf }}"></span></span>{{ n.label }}</button></sc-for>
+</nav>
+</sc-if>
+</div>
+
+<sc-if value="{{ hasToast }}"><div role="status" style="position:absolute;z-index:30;left:50%;transform:translateX(-50%);bottom:{{ L.toastB }};padding:12px 18px;border-radius:14px;background:{{ t.toastBg }};color:{{ t.toastFg }};font-weight:600;font-size:14px;white-space:nowrap">{{ toast }}</div></sc-if>
+
+<sc-if value="{{ sheetOpen }}">
+<div onClick="{{ closeSheet }}" style="position:absolute;inset:0;z-index:20;background:{{ t.scrim }}"></div>
+<div role="dialog" aria-modal="true" aria-label="{{ sheetTitle }}" style="position:absolute;z-index:21;left:{{ L.shL }};right:{{ L.shR }};bottom:{{ L.shB }};top:{{ L.shT }};transform:{{ L.shTf }};width:{{ L.shW }};max-height:90%;overflow-y:auto;box-sizing:border-box;background:{{ t.surface }};color:{{ t.ink }};border-radius:{{ L.shRad }};padding:10px 20px 24px">
+<div aria-hidden="true" style="width:40px;height:5px;border-radius:9px;background:{{ t.lineStrong }};margin:0 auto 12px;opacity:{{ L.grab }}"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px"><h2 style="margin:0;font-size:20px;font-weight:700">{{ sheetTitle }}</h2><button type="button" aria-label="Close" onClick="{{ closeSheet }}" style="flex:none;width:44px;height:44px;border-radius:50%;border:0;background:{{ t.surface2 }};color:{{ t.ink }};font-size:22px;line-height:1;cursor:pointer">×</button></div>
+
+<sc-if value="{{ shXfer }}">
+<sc-if value="{{ xs.review }}">
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="text-align:center;padding:8px 0 4px"><div style="font-size:13px;font-weight:600;color:{{ t.ink2 }}">You're sending</div><div style="font-size:44px;font-weight:700;letter-spacing:-.025em;line-height:1.1">{{ xs.amt }}</div></div>
+<dl style="margin:0;border-radius:16px;background:{{ t.surface2 }};padding:4px 16px">
+<div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid {{ t.line }}"><dt style="color:{{ t.ink2 }}">From</dt><dd style="margin:0;font-weight:600;text-align:right">{{ xs.from }}</dd></div>
+<div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid {{ t.line }}"><dt style="color:{{ t.ink2 }}">To</dt><dd style="margin:0;font-weight:600;text-align:right">{{ xs.to }}</dd></div>
+<div style="display:flex;justify-content:space-between;gap:12px;padding:12px 0"><dt style="color:{{ t.ink2 }}">{{ xs.afterLbl }}</dt><dd style="margin:0;font-weight:600;text-align:right">{{ xs.after }}</dd></div>
+</dl>
+<sc-if value="{{ xs.isErr }}"><div role="alert" style="display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:{{ t.dangerBg }};color:{{ t.ink }};font-size:14px"><span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span><span><strong style="display:block">Transfer not sent</strong>{{ xs.err }}</span></div></sc-if>
+<button type="button" onClick="{{ xferSend }}" disabled="{{ xs.sending }}" style="min-height:54px;border:0;border-radius:16px;background:{{ xs.btnBg }};color:{{ xs.btnFg }};font:700 16px Figtree,system-ui,sans-serif;cursor:pointer">{{ xs.btn }}</button>
+<button type="button" onClick="{{ xferEdit }}" disabled="{{ xs.sending }}" style="min-height:48px;border:1.5px solid {{ t.lineStrong }};border-radius:16px;background:transparent;color:{{ t.ink }};font:600 15px Figtree,system-ui,sans-serif;cursor:pointer">Edit details</button>
+</div>
+</sc-if>
+<sc-if value="{{ xs.success }}">
+<div role="status" style="display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:8px 0 4px">
+<span aria-hidden="true" style="width:64px;height:64px;border-radius:50%;background:{{ t.successBg }};color:{{ t.successFg }};display:grid;place-items:center;font-size:30px;font-weight:800">✓</span>
+<div style="font-size:30px;font-weight:700;letter-spacing:-.02em">{{ xs.sent }}</div>
+<div style="color:{{ t.ink2 }}">to <strong style="color:{{ t.ink }}">{{ xs.to }}</strong> from {{ xs.from }}</div>
+<div style="font-size:14px;padding:8px 12px;border-radius:12px;background:{{ t.surface2 }}">{{ xs.afterNow }}</div>
+<button type="button" onClick="{{ closeSheet }}" style="margin-top:8px;align-self:stretch;min-height:54px;border:0;border-radius:16px;background:{{ t.accent }};color:{{ t.onAccent }};font:700 16px Figtree,system-ui,sans-serif;cursor:pointer">Done</button>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ shUser }}">
+<div style="display:flex;flex-direction:column;gap:16px">
+<div style="display:flex;gap:10px;padding:12px 14px;border-radius:14px;background:{{ t.warnBg }};font-size:13.5px;line-height:1.45"><span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;border:2px solid {{ t.warnFg }};color:{{ t.warnFg }};display:grid;place-items:center;font-size:11px;font-weight:800">i</span><span><strong>Demo only</strong> — picking a user is not authentication; payments use a simulated provider, no real money moves.</span></div>
+<div role="radiogroup" aria-label="Act as" style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ userRows }}" as="u"><button type="button" role="radio" aria-checked="{{ u.sel }}" onClick="{{ u.pick }}" style="min-height:56px;display:flex;align-items:center;gap:12px;padding:6px 14px 6px 8px;border-radius:14px;border:1.5px solid {{ u.bd }};background:{{ u.bg }};color:{{ t.ink }};font-family:inherit;text-align:left;cursor:pointer"><span aria-hidden="true" style="width:38px;height:38px;border-radius:50%;background:{{ t.accentSoft }};color:{{ t.accentInk }};display:grid;place-items:center;font-weight:700">{{ u.initial }}</span><span style="flex:1"><span style="display:block;font-weight:600;font-size:15px">{{ u.name }}</span><span style="font-size:12.5px;color:{{ t.ink2 }}">{{ u.count }}</span></span><span aria-hidden="true" style="width:20px;height:20px;border-radius:50%;border:2px solid {{ u.dot }};box-shadow:inset 0 0 0 4px {{ t.surface }};background:{{ u.dotFill }}"></span></button></sc-for>
+</div>
+<form onSubmit="{{ addUser }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid {{ t.line }}">
+<label for="{{ ids.newUser }}" style="font-weight:700;font-size:14px">Add a new user</label>
+<div style="display:flex;gap:8px"><input id="{{ ids.newUser }}" placeholder="Name" value="{{ newUser }}" onChange="{{ setNewUser }}" aria-describedby="{{ ids.newUserHelp }}" style="flex:1;min-width:0;min-height:48px;padding:0 14px;border-radius:12px;border:1.5px solid {{ newUserBd }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }}"><button type="submit" style="min-height:48px;padding:0 18px;border-radius:12px;border:0;background:{{ t.ink }};color:{{ t.bg }};font:700 15px Figtree,system-ui,sans-serif;cursor:pointer">Add</button></div>
+<div id="{{ ids.newUserHelp }}" style="font-size:13px;font-weight:{{ newUserW }};color:{{ newUserFg }}">{{ newUserHelp }}</div>
+</form>
+</div>
+</sc-if>
+
+<sc-if value="{{ shOpen }}">
+<form onSubmit="{{ createAcct }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:10px">
+<label for="{{ ids.newAcct }}" style="font-weight:700;font-size:14px">Account name</label>
+<input id="{{ ids.newAcct }}" placeholder="e.g. Groceries" value="{{ newAcct }}" onChange="{{ setNewAcct }}" aria-describedby="{{ ids.newAcctHelp }}" style="min-height:52px;padding:0 14px;border-radius:14px;border:1.5px solid {{ newAcctBd }};background:{{ t.field }};color:{{ t.ink }};font:500 16px Figtree,system-ui,sans-serif" style-focus="outline:3px solid {{ t.ring }}">
+<div id="{{ ids.newAcctHelp }}" style="font-size:13px;font-weight:{{ newAcctW }};color:{{ newAcctFg }}">{{ newAcctHelp }}</div>
+<button type="submit" style="margin-top:6px;min-height:54px;border:0;border-radius:16px;background:{{ t.accent }};color:{{ t.onAccent }};font:700 16px Figtree,system-ui,sans-serif;cursor:pointer">Open account</button>
+</form>
+</sc-if>
+
+<sc-if value="{{ shDev }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<p style="margin:0;font-size:13.5px;color:{{ t.ink2 }}">Only in dev builds. Controls how the simulated provider answers the next payment or status check.</p>
+<div role="radiogroup" aria-label="Provider behaviour" style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ devModes }}" as="d"><button type="button" role="radio" aria-checked="{{ d.sel }}" onClick="{{ d.pick }}" style="min-height:56px;display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:14px;border:1.5px solid {{ d.bd }};background:{{ d.bg }};color:{{ t.ink }};font-family:inherit;text-align:left;cursor:pointer"><span aria-hidden="true" style="flex:none;width:20px;height:20px;border-radius:50%;border:2px solid {{ d.dot }};box-shadow:inset 0 0 0 4px {{ t.surface }};background:{{ d.dotFill }}"></span><span><span style="display:block;font-weight:600;font-size:14.5px">{{ d.label }}</span><span style="font-size:12.5px;color:{{ t.ink2 }}">{{ d.desc }}</span></span></button></sc-for>
+</div>
+<button type="button" role="switch" aria-checked="{{ failRefresh }}" onClick="{{ toggleFail }}" style="min-height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 14px;border-radius:14px;border:1.5px solid {{ t.line }};background:transparent;color:{{ t.ink }};font:600 14.5px Figtree,system-ui,sans-serif;text-align:left;cursor:pointer"><span>Fail data refresh<span style="display:block;font-weight:400;font-size:12.5px;color:{{ t.ink2 }}">Shows the non-blocking "last loaded data" banner</span></span><span aria-hidden="true" style="flex:none;width:46px;height:28px;border-radius:99px;background:{{ swBg }};position:relative"><span style="position:absolute;top:3px;left:{{ swX }};width:22px;height:22px;border-radius:50%;background:{{ t.surface }}"></span></span></button>
+<button type="button" onClick="{{ doRefresh }}" style="min-height:48px;border-radius:14px;border:1.5px solid {{ t.lineStrong }};background:transparent;color:{{ t.ink }};font:600 15px Figtree,system-ui,sans-serif;cursor:pointer">Refresh data now</button>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ isKit }}">
+<div style="width:{{ L.w }};box-sizing:border-box;padding:28px;background:{{ t.bg }};color:{{ t.ink }};font-family:Figtree,system-ui,sans-serif;font-variant-numeric:tabular-nums;display:flex;flex-direction:column;gap:26px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="margin:0;font-size:22px;font-weight:700">Tokens &amp; components</h2><span style="font-size:13px;font-weight:600;color:{{ t.ink2 }}">{{ themeName }} · Figtree</span></div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+<sc-for list="{{ swatches }}" as="w"><div style="display:flex;flex-direction:column;gap:6px"><span style="height:44px;border-radius:12px;background:{{ w.v }};border:1px solid {{ t.line }}"></span><span style="font-size:12px;font-weight:700">{{ w.n }}</span><span style="font:11px ui-monospace,Menlo,monospace;color:{{ t.ink2 }}">{{ w.v }}</span></div></sc-for>
+</div>
+<div style="display:grid;grid-template-columns:1.3fr 1fr;gap:24px">
+<div style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Type scale</h3>
+<div style="font-size:44px;font-weight:700;letter-spacing:-.025em;line-height:1">$6,553<span style="color:{{ t.ink2 }};font-size:28px">.25</span></div>
+<div style="font-size:12px;color:{{ t.ink2 }}">Display 44/700 · cents 28 muted · tabular</div>
+<div style="font-size:28px;font-weight:700">$1,240.50 <span style="font-size:12px;font-weight:500;color:{{ t.ink2 }}">Amount 28/700</span></div>
+<div style="font-size:20px;font-weight:700">Sheet title <span style="font-size:12px;font-weight:500;color:{{ t.ink2 }}">20/700</span></div>
+<div style="font-size:15px">Body text reads at 15/1.45 <span style="font-size:12px;color:{{ t.ink2 }}">15/400</span></div>
+<div style="font-size:13px;color:{{ t.ink2 }}">Helper &amp; meta 13/400 · min 12</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Spacing · radius</h3>
+<sc-for list="{{ spaces }}" as="sp"><div style="display:flex;align-items:center;gap:10px;font:12px ui-monospace,Menlo,monospace;color:{{ t.ink2 }}"><span style="width:28px">{{ sp.n }}</span><span style="height:10px;width:{{ sp.w }};border-radius:3px;background:{{ t.accent }}"></span></div></sc-for>
+<div style="display:flex;gap:8px;margin-top:6px"><sc-for list="{{ radii }}" as="r"><div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="width:40px;height:40px;border:2px solid {{ t.lineStrong }};border-radius:{{ r.v }}"></span><span style="font:11px ui-monospace,Menlo,monospace;color:{{ t.ink2 }}">{{ r.n }}</span></div></sc-for></div>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+<div style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Buttons</h3>
+<button type="button" style="min-height:54px;border:0;border-radius:16px;background:{{ t.accent }};color:{{ t.onAccent }};font:700 16px Figtree,system-ui,sans-serif">Primary · Send $12.34</button>
+<button type="button" style="min-height:48px;border:1.5px solid {{ t.lineStrong }};border-radius:16px;background:transparent;color:{{ t.ink }};font:600 15px Figtree,system-ui,sans-serif">Secondary · Edit details</button>
+<button type="button" disabled="{{ true }}" style="min-height:54px;border:0;border-radius:16px;background:{{ t.disabledBg }};color:{{ t.disabledFg }};font:700 16px Figtree,system-ui,sans-serif">Sending…</button>
+<h3 style="margin:8px 0 0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Status badges · glyph + word</h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ badges }}" as="b"><span style="display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 10px 0 5px;border-radius:999px;background:{{ b.bg }};color:{{ b.fg }};font-size:13px;font-weight:700"><span aria-hidden="true" style="width:16px;height:16px;border-radius:50%;background:{{ b.fg }};color:{{ b.bg }};display:grid;place-items:center;font-size:10px">{{ b.glyph }}</span>{{ b.label }}</span></sc-for></div>
+<h3 style="margin:8px 0 0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Banner · toast</h3>
+<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:{{ t.warnBg }};font-size:14px"><span aria-hidden="true" style="flex:none;width:18px;height:18px;border-radius:50%;border:2px solid {{ t.warnFg }};color:{{ t.warnFg }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span><span style="flex:1">Could not refresh — showing last loaded data.</span><span style="font-weight:700;color:{{ t.warnFg }};text-decoration:underline">Retry</span></div>
+<div style="align-self:flex-start;padding:12px 18px;border-radius:14px;background:{{ t.toastBg }};color:{{ t.toastFg }};font-weight:600;font-size:14px">Opened “Groceries”</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px"><h3 style="margin:0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Amount input · default / error</h3>
+<div style="position:relative"><span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:700;color:{{ t.ink2 }}">$</span><div style="min-height:64px;padding:0 14px 0 40px;border-radius:16px;border:2px solid {{ t.lineStrong }};background:{{ t.field }};font-size:28px;font-weight:700;display:flex;align-items:center">12.34</div></div>
+<div style="position:relative"><span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:700;color:{{ t.ink2 }}">$</span><div style="min-height:64px;padding:0 14px 0 40px;border-radius:16px;border:2px solid {{ t.dangerFg }};background:{{ t.field }};font-size:28px;font-weight:700;display:flex;align-items:center">12.345</div></div>
+<div style="display:flex;gap:8px;font-size:13.5px;font-weight:600;color:{{ t.dangerFg }}"><span style="flex:none;width:16px;height:16px;border-radius:50%;background:{{ t.dangerFg }};color:{{ t.surface }};display:grid;place-items:center;font-size:11px;font-weight:800">!</span>Use numbers with up to 2 decimals, like 12.34.</div>
+<h3 style="margin:8px 0 0;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:{{ t.ink2 }}">Account card · list row · sheet</h3>
+<div style="padding:16px;border-radius:20px;border:1px solid {{ t.line }};background:{{ t.surface }};display:flex;flex-direction:column;gap:8px"><span style="font-weight:700">Main</span><span style="font-size:26px;font-weight:700">$1,240.50</span><span style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:{{ t.warnFg }}"><span style="width:12px;height:12px;border-radius:4px;background-image:{{ hatch }};outline:1px solid {{ t.warnFg }}"></span>Reserved $240.00</span></div>
+<div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid {{ t.line }};font-size:14px"><span><strong style="display:block;font-weight:600">Payment reserved</strong><span style="color:{{ t.ink2 }};font-size:12.5px">Oct 18, 20:01</span></span><span style="text-align:right"><strong style="display:block">−$180.00</strong><span style="color:{{ t.warnFg }};font-size:12.5px;font-weight:600">Reserved +$180.00</span></span></div>
+<div style="border-radius:24px 24px 0 0;background:{{ t.surface }};border:1px solid {{ t.line }};border-bottom:0;padding:10px 16px 18px"><div style="width:40px;height:5px;border-radius:9px;background:{{ t.lineStrong }};margin:0 auto 10px"></div><div style="font-weight:700;font-size:17px">Bottom sheet</div><div style="font-size:13px;color:{{ t.ink2 }}">Grab handle, title, 44px close. Centered dialog ≥ 700px.</div></div>
+</div>
+</div>
+</div>
+</sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:375,&quot;height&quot;:812},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;width&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;375&quot;,&quot;768&quot;,&quot;1280&quot;],&quot;default&quot;:&quot;375&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;height&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:812,&quot;tsType&quot;:&quot;number&quot;},&quot;preset&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;none&quot;,&quot;transfer-invalid&quot;,&quot;transfer-review&quot;,&quot;transfer-funds&quot;,&quot;transfer-success&quot;,&quot;pay&quot;,&quot;pay-unconfirmed&quot;,&quot;activity-payments&quot;,&quot;activity-history&quot;,&quot;user&quot;,&quot;dev&quot;,&quot;refresh-error&quot;,&quot;open&quot;],&quot;default&quot;:&quot;none&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;view&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;app&quot;,&quot;kit&quot;],&quot;default&quot;:&quot;app&quot;,&quot;tsType&quot;:&quot;'app'|'kit'&quot;}}">
+const MAX = 100000000;
+const NOFUNDS = 'The account does not have enough available funds.';
+const nf = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = c => (c < 0 ? '−$' : '$') + nf.format(Math.abs(c) / 100);
+const signed = c => c === 0 ? '—' : (c > 0 ? '+$' : '−$') + nf.format(Math.abs(c) / 100);
+const nowLabel = () => new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false });
+const timeLabel = () => new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+const rid = () => Math.random().toString(36).slice(2, 9);
+function parseAmount(raw) {
+  const s = String(raw || '').replace(/[\s,$]/g, '');
+  if (!s) return { err: 'Enter an amount.' };
+  if (!/^(\d+(\.\d{1,2})?|\.\d{1,2})$/.test(s)) return { err: 'Use numbers with up to 2 decimals, like 12.34.' };
+  const c = Math.round(parseFloat(s) * 100);
+  if (c <= 0) return { err: 'Enter an amount greater than $0.00.' };
+  if (c > MAX) return { err: 'The maximum is $1,000,000.00.' };
+  return { c };
+}
+const H = (acct, at, type, dA, dR, after, note) => ({ id: rid(), acct, at, type, dA, dR, after, note: note || '' });
+function seed() {
+  return {
+    users: [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }, { id: 'carol', name: 'Carol' }],
+    accounts: [
+      { id: 'a1', user: 'alice', name: 'Main', avail: 124050, res: 24000 },
+      { id: 'a2', user: 'alice', name: 'Savings', avail: 500000, res: 0 },
+      { id: 'a3', user: 'alice', name: 'Travel', avail: 31275, res: 0 },
+      { id: 'b1', user: 'bob', name: 'Main', avail: 82000, res: 0 },
+      { id: 'b2', user: 'bob', name: 'Rent', avail: 150000, res: 0 },
+      { id: 'c1', user: 'carol', name: 'Main', avail: 43010, res: 0 }],
+    history: [
+      H('a1', 'Oct 19, 09:40', 'Payment reserved', -6000, 6000, 124050, 'Room 118 #BK-1031'),
+      H('a1', 'Oct 18, 20:01', 'Payment reserved', -18000, 18000, 130050, 'Room 204 #BK-1029'),
+      H('a1', 'Oct 17, 10:22', 'Transfer in', 7550, 0, 148050, 'From Bob · Main'),
+      H('a1', 'Oct 16, 19:30', 'Reservation released', 15000, -15000, 140500, 'Room 301 #BK-0950'),
+      H('a1', 'Oct 16, 19:12', 'Payment reserved', -15000, 15000, 125500, 'Room 301 #BK-0950'),
+      H('a1', 'Oct 16, 18:06', 'Payment sent', 0, -9500, 140500, 'Room 112 #BK-0988'),
+      H('a1', 'Oct 16, 18:05', 'Payment reserved', -9500, 9500, 140500, 'Room 112 #BK-0988'),
+      H('a1', 'Oct 15, 13:40', 'Transfer out', -50000, 0, 150000, 'To Savings'),
+      H('a1', 'Oct 14, 09:12', 'Demo funding', 200000, 0, 200000),
+      H('a2', 'Oct 15, 13:40', 'Transfer in', 50000, 0, 500000, 'From Main'),
+      H('a2', 'Oct 14, 09:12', 'Demo funding', 450000, 0, 450000),
+      H('a3', 'Oct 14, 09:12', 'Demo funding', 31275, 0, 31275),
+      H('b1', 'Oct 17, 10:22', 'Transfer out', -7550, 0, 82000, 'To Alice · Main'),
+      H('b1', 'Oct 14, 09:12', 'Demo funding', 89550, 0, 89550),
+      H('b2', 'Oct 14, 09:12', 'Demo funding', 150000, 0, 150000),
+      H('c1', 'Oct 14, 09:12', 'Demo funding', 43010, 0, 43010)],
+    transfers: [
+      { id: 't2', from: 'b1', to: 'a1', amt: 7550, at: 'Oct 17, 10:22' },
+      { id: 't1', from: 'a1', to: 'a2', amt: 50000, at: 'Oct 15, 13:40' }],
+    payments: [
+      { id: 'p4', acct: 'a1', ref: 'Room 118 #BK-1031', amt: 6000, status: 'processing', at: 'Oct 19, 09:40', check: null },
+      { id: 'p3', acct: 'a1', ref: 'Room 204 #BK-1029', amt: 18000, status: 'unconfirmed', at: 'Oct 18, 20:01', check: null },
+      { id: 'p2', acct: 'a1', ref: 'Room 301 #BK-0950', amt: 15000, status: 'declined', at: 'Oct 16, 19:12', check: null },
+      { id: 'p1', acct: 'a1', ref: 'Room 112 #BK-0988', amt: 9500, status: 'paid', at: 'Oct 16, 18:05', check: null }]
+  };
+}
+function labelOf(s, id) {
+  const a = s.accounts.find(x => x.id === id); if (!a) return '';
+  if (a.user === s.me) return a.name;
+  const u = s.users.find(u => u.id === a.user); return (u ? u.name : '?') + ' · ' + a.name;
+}
+function adj(s, id, dA, dR, type, note) {
+  const accounts = s.accounts.map(a => a.id === id ? { ...a, avail: a.avail + dA, res: a.res + dR } : a);
+  const a = accounts.find(x => x.id === id);
+  return { ...s, accounts, history: [H(id, nowLabel(), type, dA, dR, a.avail, note), ...s.history] };
+}
+function transferApply(s, from, to, c) {
+  const fromL = labelOf(s, from), toL = labelOf(s, to);
+  const owner = id => s.accounts.find(a => a.id === id).user;
+  const nameFor = (id, viewer) => { const a = s.accounts.find(x => x.id === id); if (a.user === viewer) return a.name; return s.users.find(u => u.id === a.user).name + ' · ' + a.name; };
+  let n = adj(s, from, -c, 0, 'Transfer out', 'To ' + nameFor(to, owner(from)));
+  n = adj(n, to, c, 0, 'Transfer in', 'From ' + nameFor(from, owner(to)));
+  return { ...n, transfers: [{ id: rid(), from, to, amt: c, at: nowLabel() }, ...n.transfers] };
+}
+function payApply(s, acct, c, ref, mode) {
+  const id = rid();
+  let n = adj(s, acct, -c, c, 'Payment reserved', ref), status = 'processing';
+  if (mode === 'approve') { n = adj(n, acct, 0, -c, 'Payment sent', ref); status = 'paid'; }
+  else if (mode === 'decline') { n = adj(n, acct, c, -c, 'Reservation released', ref); status = 'declined'; }
+  else if (mode === 'lose') status = 'unconfirmed';
+  return { s: { ...n, payments: [{ id, acct, ref, amt: c, status, at: nowLabel(), check: null }, ...n.payments] }, id };
+}
+function checkApply(s, pid, mode) {
+  const p = s.payments.find(x => x.id === pid); if (!p) return s;
+  let n = s, status = p.status, text, tone;
+  if (mode === 'timeout') { text = 'still waiting on the provider. Nothing changed; try again later.'; tone = 'warn'; }
+  else if (mode === 'decline') { n = adj(s, p.acct, p.amt, -p.amt, 'Reservation released', p.ref); status = 'declined'; text = 'the provider declined. ' + money(p.amt) + ' is back in Available.'; tone = 'danger'; }
+  else { n = adj(s, p.acct, 0, -p.amt, 'Payment sent', p.ref); status = 'paid'; text = 'the provider confirmed the charge. ' + money(p.amt) + ' left Reserved as a payment.'; tone = 'success'; }
+  return { ...n, payments: n.payments.map(x => x.id === pid ? { ...x, status, check: { at: timeLabel(), text, tone } } : x) };
+}
+const STATUS = { paid: { label: 'Paid', glyph: '✓', tone: 'success' }, declined: { label: 'Declined', glyph: '✕', tone: 'danger' }, unconfirmed: { label: 'Unconfirmed', glyph: '?', tone: 'warn' }, processing: { label: 'Processing', glyph: '…', tone: 'info' } };
+const PENDING = st => st === 'processing' || st === 'unconfirmed';
+const TOK = {
+  light: { bg: 'oklch(0.972 0.006 155)', surface: 'oklch(0.998 0.002 155)', surface2: 'oklch(0.945 0.008 155)', field: 'oklch(0.998 0.002 155)', line: 'oklch(0.9 0.008 155)', lineStrong: 'oklch(0.72 0.012 155)', ink: 'oklch(0.23 0.02 165)', ink2: 'oklch(0.46 0.015 165)', accent: 'oklch(0.44 0.085 168)', onAccent: 'oklch(0.99 0.005 165)', accentSoft: 'oklch(0.92 0.035 168)', accentInk: 'oklch(0.38 0.075 168)', ring: 'oklch(0.44 0.085 168 / .35)', successFg: 'oklch(0.44 0.1 150)', successBg: 'oklch(0.94 0.045 150)', warnFg: 'oklch(0.47 0.1 65)', warnBg: 'oklch(0.95 0.05 85)', dangerFg: 'oklch(0.49 0.16 27)', dangerBg: 'oklch(0.95 0.03 27)', infoFg: 'oklch(0.46 0.11 250)', infoBg: 'oklch(0.95 0.03 250)', disabledBg: 'oklch(0.9 0.006 155)', disabledFg: 'oklch(0.48 0.01 155)', scrim: 'oklch(0.2 0.02 165 / .45)', toastBg: 'oklch(0.25 0.02 165)', toastFg: 'oklch(0.97 0.005 155)', shadow: '0 1px 2px oklch(0.3 0.02 165 / .06), 0 8px 24px oklch(0.3 0.02 165 / .06)' },
+  dark: { bg: 'oklch(0.17 0.012 165)', surface: 'oklch(0.215 0.014 165)', surface2: 'oklch(0.26 0.014 165)', field: 'oklch(0.19 0.012 165)', line: 'oklch(0.31 0.014 165)', lineStrong: 'oklch(0.5 0.015 165)', ink: 'oklch(0.95 0.008 155)', ink2: 'oklch(0.76 0.012 155)', accent: 'oklch(0.8 0.11 168)', onAccent: 'oklch(0.2 0.03 168)', accentSoft: 'oklch(0.32 0.045 168)', accentInk: 'oklch(0.86 0.09 168)', ring: 'oklch(0.8 0.11 168 / .4)', successFg: 'oklch(0.82 0.13 150)', successBg: 'oklch(0.3 0.05 150)', warnFg: 'oklch(0.84 0.12 80)', warnBg: 'oklch(0.31 0.05 70)', dangerFg: 'oklch(0.79 0.13 27)', dangerBg: 'oklch(0.32 0.07 27)', infoFg: 'oklch(0.81 0.1 250)', infoBg: 'oklch(0.3 0.05 250)', disabledBg: 'oklch(0.3 0.01 165)', disabledFg: 'oklch(0.7 0.01 165)', scrim: 'oklch(0.05 0.01 165 / .6)', toastBg: 'oklch(0.93 0.01 155)', toastFg: 'oklch(0.2 0.02 165)', shadow: 'none' }
+};
+const NOTICE = 'Demo only — picking a user is not authentication; payments use a simulated provider, no real money moves.';
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.uid = 'cw' + rid();
+    this.timers = [];
+    this.state = { ...seed(), me: 'alice', tab: 'accounts',
+      x: { from: 'a1', mode: 'mine', to: 'a2', amount: '', touched: false, phase: 'form', err: '', done: null },
+      p: { from: 'a1', amount: '', ref: '', touched: false, sending: false, err: '', last: null, dup: false },
+      act: 'history', histAcct: 'a1', sheet: null, newUser: '', newUserErr: '', newAcct: '', newAcctErr: '',
+      dev: 'approve', failRefresh: false, refreshErr: false, checking: null, toast: null };
+  }
+  componentDidMount() { this.preset(this.props.preset); }
+  componentWillUnmount() { this.timers.forEach(clearTimeout); }
+  later(fn, ms) { this.timers.push(setTimeout(fn, ms)); }
+  showToast(text) { this.setState({ toast: text }); clearTimeout(this.tt); this.tt = setTimeout(() => this.setState({ toast: null }), 2600); }
+  preset(k) {
+    const S = f => this.setState(f);
+    if (k === 'transfer-invalid') S(s => ({ tab: 'transfer', x: { ...s.x, mode: 'people', to: 'b1', amount: '12.345', touched: true } }));
+    if (k === 'transfer-review') S(s => ({ tab: 'transfer', sheet: 'xfer', x: { ...s.x, mode: 'people', to: 'b1', amount: '12.34', phase: 'review' } }));
+    if (k === 'transfer-funds') S(s => ({ tab: 'transfer', sheet: 'xfer', x: { ...s.x, mode: 'people', to: 'b1', amount: '2000', phase: 'error', err: NOFUNDS } }));
+    if (k === 'transfer-success') S(s => ({ ...transferApply(s, 'a1', 'b1', 1234), tab: 'transfer', sheet: 'xfer', x: { ...s.x, mode: 'people', to: 'b1', amount: '12.34', phase: 'success', done: { c: 1234, from: 'a1', to: 'b1' } } }));
+    if (k === 'pay') S(s => ({ tab: 'pay', p: { ...s.p, amount: '120.00', ref: 'Room 207 #BK-1040' } }));
+    if (k === 'pay-unconfirmed') S(s => { const r = payApply(s, 'a1', 12000, 'Room 207 #BK-1040', 'lose'); return { ...r.s, tab: 'pay', dev: 'lose', p: { ...s.p, amount: '120.00', ref: 'Room 207 #BK-1040', last: r.id } }; });
+    if (k === 'activity-payments') S(s => ({ ...checkApply(checkApply(s, 'p3', 'approve'), 'p4', 'timeout'), tab: 'activity', act: 'payments' }));
+    if (k === 'activity-history') S({ tab: 'activity', act: 'history' });
+    if (k === 'user') S({ sheet: 'user' });
+    if (k === 'dev') S({ sheet: 'dev', failRefresh: true, refreshErr: true });
+    if (k === 'refresh-error') S({ refreshErr: true });
+    if (k === 'open') S({ sheet: 'open', newAcct: 'Groceries' });
+  }
+  setX(patch) { this.setState(s => ({ x: { ...s.x, ...patch } })); }
+  setP(patch) { this.setState(s => ({ p: { ...s.p, ...patch } })); }
+  toOptions(s, x) {
+    const mine = s.accounts.filter(a => a.user === s.me);
+    return x.mode === 'mine' ? mine.filter(a => a.id !== x.from) : s.accounts.filter(a => a.user !== s.me);
+  }
+  renderVals() {
+    const s = this.state, P = this.props, uid = this.uid;
+    const theme = P.theme === 'dark' ? 'dark' : 'light', t = TOK[theme];
+    const isKit = P.view === 'kit';
+    const W = +P.width || (isKit ? 720 : 375), Hh = +P.height || 812;
+    const size = W >= 1100 ? 'desktop' : W >= 700 ? 'tablet' : 'phone';
+    const isPhone = size === 'phone', isTablet = size === 'tablet', isDesktop = size === 'desktop';
+    const hatch = `repeating-linear-gradient(135deg, ${t.warnFg} 0 2px, transparent 2px 5px)`;
+    const L = { w: W + 'px', h: Hh + 'px', dir: isDesktop ? 'row' : 'column',
+      headPad: isPhone ? '14px 16px 10px' : isTablet ? '22px 28px 14px' : '28px 40px 16px',
+      titleSize: isPhone ? '24px' : '28px', pad: isPhone ? '4px 16px 24px' : isTablet ? '8px 28px 32px' : '8px 40px 40px',
+      maxW: isDesktop ? '1040px' : isTablet ? '680px' : 'none', cardCols: isPhone ? '1fr' : isTablet ? '1fr 1fr' : 'repeat(3,minmax(0,1fr))',
+      big: isPhone ? '44px' : '56px', bigCents: isPhone ? '28px' : '34px',
+      bannerMargin: isPhone ? '0 16px 10px' : isTablet ? '0 28px 12px' : '0 40px 12px',
+      toastB: isPhone ? '96px' : '32px',
+      shL: isPhone ? '0' : '50%', shR: isPhone ? '0' : 'auto', shB: isPhone ? '0' : 'auto', shT: isPhone ? 'auto' : '50%',
+      shTf: isPhone ? 'none' : 'translate(-50%,-50%)', shW: isPhone ? 'auto' : '440px', shRad: isPhone ? '24px 24px 0 0' : '24px', grab: isPhone ? '1' : '0' };
+    const ids = {}; ['from', 'toLbl', 'to', 'amt', 'amtHelp', 'pFrom', 'pRef', 'pRefHelp', 'pAmt', 'pAmtHelp', 'newUser', 'newUserHelp', 'newAcct', 'newAcctHelp'].forEach(k => ids[k] = uid + '-' + k);
+    const me = s.users.find(u => u.id === s.me);
+    const mine = s.accounts.filter(a => a.user === s.me);
+    const acct = id => s.accounts.find(a => a.id === id);
+    const tone = k => ({ fg: t[k + 'Fg'], bg: t[k + 'Bg'] });
+    const go = tab => () => this.setState({ tab });
+    const shapes = { accounts: ['3px', 'none'], transfer: ['50%', 'none'], pay: ['2px', 'rotate(45deg)'], activity: ['1px', 'none'] };
+    const nav = [['accounts', 'Accounts'], ['transfer', 'Transfer'], ['pay', 'Pay'], ['activity', 'Activity']].map(([k, label]) => {
+      const cur = s.tab === k;
+      return { label, go: go(k), cur: cur ? 'page' : undefined, ir: shapes[k][0], tf: shapes[k][1],
+        bg: cur ? t.accentSoft : 'transparent', fg: cur ? t.accentInk : t.ink2,
+        tabFg: cur ? t.accentInk : t.ink2, pill: cur ? t.accentSoft : 'transparent',
+        segBg: cur ? t.surface : 'transparent', segFg: cur ? t.ink : t.ink2, segSh: cur ? '0 1px 3px rgba(0,0,0,.12)' : 'none' };
+    });
+    const seg = (sel) => ({ bg: sel ? t.surface : 'transparent', fg: sel ? t.ink : t.ink2, sh: sel ? '0 1px 3px rgba(0,0,0,.12)' : 'none', sel: sel ? 'true' : 'false' });
+    const totA = mine.reduce((n, a) => n + a.avail, 0), totR = mine.reduce((n, a) => n + a.res, 0);
+    const totStr = money(totA), dot = totStr.lastIndexOf('.');
+    const sum = Math.max(totA + totR, 1);
+    const minePending = s.payments.filter(p => PENDING(p.status) && mine.some(a => a.id === p.acct));
+    const cards = mine.map(a => ({ name: a.name, avail: money(a.avail),
+      resText: a.res ? 'Reserved ' + money(a.res) : 'Nothing reserved', resFg: a.res ? t.warnFg : t.ink2, swatch: a.res ? hatch : 'none',
+      aria: `${a.name}: ${money(a.avail)} available, ${a.res ? money(a.res) + ' reserved' : 'nothing reserved'}. Open history.`,
+      open: () => this.setState({ tab: 'activity', act: 'history', histAcct: a.id }) }));
+    const fromOpts = mine.map(a => ({ id: a.id, label: `${a.name} — ${money(a.avail)} available` }));
+    // transfer
+    const x = s.x, fromA = acct(x.from) || mine[0];
+    const toList = this.toOptions(s, x);
+    const toId = toList.some(a => a.id === x.to) ? x.to : (toList[0] && toList[0].id);
+    const xc = parseAmount(x.amount);
+    const over = xc.c && fromA && xc.c > fromA.avail;
+    const xShowErr = x.touched && !!xc.err;
+    const xf = { from: fromA && fromA.id, to: toId, amount: x.amount, hasTo: toList.length > 0, noTo: toList.length === 0,
+      fromHint: fromA ? (fromA.res ? `${money(fromA.res)} is reserved and can't be sent.` : 'Only available money can be sent.') : '',
+      toHint: x.mode === 'people' ? "You'll never see other people's balances." : 'Moves money between your own accounts.',
+      showErr: xShowErr, invalid: xShowErr ? 'true' : 'false',
+      help: xShowErr ? xc.err : over ? `That's more than ${fromA.name}'s ${money(fromA.avail)} available.` : `Up to 2 decimals · max $1,000,000.00`,
+      helpFg: xShowErr ? t.dangerFg : over ? t.warnFg : t.ink2, helpW: xShowErr || over ? 600 : 400,
+      amtBd: xShowErr ? t.dangerFg : t.lineStrong };
+    const toModes = [['mine', 'My accounts'], ['people', 'Another person']].map(([k, label]) => ({ label, ...seg(x.mode === k), pick: () => this.setX({ mode: k, to: (this.toOptions(s, { ...x, mode: k })[0] || {}).id }) }));
+    const sending = x.phase === 'sending';
+    const done = x.done;
+    const xs = { review: ['review', 'sending', 'error'].includes(x.phase), success: x.phase === 'success', sending, isErr: x.phase === 'error', err: x.err,
+      amt: xc.c ? money(xc.c) : '', from: fromA ? fromA.name : '', to: labelOf(s, toId),
+      afterLbl: fromA ? `${fromA.name} after` : '', after: fromA && xc.c ? money(fromA.avail - xc.c) + ' available' : '',
+      btn: sending ? 'Sending…' : 'Send ' + (xc.c ? money(xc.c) : ''), btnBg: sending ? t.disabledBg : t.accent, btnFg: sending ? t.disabledFg : t.onAccent };
+    if (done) { const fa = acct(done.from); Object.assign(xs, { sent: 'Sent ' + money(done.c), to: labelOf(s, done.to), from: fa.name, afterNow: `${fa.name} now has ${money(fa.avail)} available` }); }
+    // pay
+    const p = s.p, pA = acct(p.from) || mine[0], pc = parseAmount(p.amount);
+    const pShowErr = p.touched && !!pc.err, pRefBad = p.touched && !p.ref.trim();
+    const pf = { from: pA && pA.id, amount: p.amount, ref: p.ref, sending: p.sending,
+      fromHint: pA ? `${money(pA.avail)} available in ${pA.name}` : '',
+      showErr: pShowErr, invalid: pShowErr ? 'true' : 'false', help: pShowErr ? pc.err : 'The amount on your booking, in USD.',
+      helpFg: pShowErr ? t.dangerFg : t.ink2, helpW: pShowErr ? 600 : 400, amtBd: pShowErr ? t.dangerFg : t.lineStrong,
+      refInvalid: pRefBad ? 'true' : undefined, refBd: pRefBad ? t.dangerFg : t.lineStrong,
+      hasServerErr: !!p.err, serverErr: p.err,
+      btn: p.sending ? 'Contacting provider…' : pc.c ? 'Pay ' + money(pc.c) : 'Pay', btnBg: p.sending ? t.disabledBg : t.accent, btnFg: p.sending ? t.disabledFg : t.onAccent };
+    const lastP = s.payments.find(q => q.id === p.last);
+    let pr = null;
+    if (lastP) {
+      const st = STATUS[lastP.status], tn = tone(st.tone), m = money(lastP.amt), an = acct(lastP.acct).name;
+      const body = { paid: `Paid from ${an}. It's in your payments as Paid.`,
+        declined: `The provider declined this payment. ${m} is back in Available in ${an}.`,
+        unconfirmed: `The provider didn't reply, so we don't know yet if it charged. ${m} is held in Reserved — not lost. Check status, or pay again with the same details; you won't be charged twice.`,
+        processing: `The provider hasn't charged yet. ${m} is held in Reserved until it does, or releases it.` }[lastP.status];
+      pr = { label: st.label, glyph: st.glyph, fg: tn.fg, bg: tn.bg, amt: m, ref: lastP.ref, body, dup: p.dup, pending: PENDING(lastP.status),
+        checking: s.checking === lastP.id, checkBtn: s.checking === lastP.id ? 'Checking…' : 'Check status',
+        hasCheck: !!lastP.check, checkText: lastP.check ? `Checked ${lastP.check.at} — ${lastP.check.text}` : '',
+        onCheck: () => this.checkStatus(lastP.id) };
+    }
+    // activity
+    const actTabs = [['history', 'History'], ['transfers', 'Transfers'], ['payments', 'Payments']].map(([k, label]) => ({ label, ...seg(s.act === k), pick: () => this.setState({ act: k }) }));
+    const histId = mine.some(a => a.id === s.histAcct) ? s.histAcct : (mine[0] && mine[0].id);
+    const histChips = mine.map(a => { const sel = a.id === histId; return { name: a.name, sel: sel ? 'true' : 'false', pick: () => this.setState({ histAcct: a.id }), bg: sel ? t.ink : t.surface, fg: sel ? t.bg : t.ink, bd: sel ? t.ink : t.line }; });
+    const histRows = s.history.filter(h => h.acct === histId).map(h => ({ at: h.at, type: h.type, note: h.note, dA: signed(h.dA), dR: signed(h.dR), hasR: h.dR !== 0, after: money(h.after), aFg: h.dA > 0 ? t.successFg : t.ink, rFg: h.dR ? t.warnFg : t.ink2 }));
+    const mineIds = new Set(mine.map(a => a.id));
+    const xferRows = s.transfers.filter(r => mineIds.has(r.from) || mineIds.has(r.to)).map(r => {
+      const inF = mineIds.has(r.from), inT = mineIds.has(r.to);
+      const kind = inF && inT ? 'Between your accounts' : inF ? 'Sent' : 'Received';
+      return { from: labelOf(s, r.from), to: labelOf(s, r.to), at: r.at, kind, amt: inF && inT ? money(r.amt) : inF ? signed(-r.amt) : signed(r.amt), fg: !inF ? t.successFg : t.ink };
+    });
+    const payRows = s.payments.filter(q => mineIds.has(q.acct)).map(q => {
+      const st = STATUS[q.status], tn = tone(st.tone), ck = q.check;
+      return { ref: q.ref, acct: acct(q.acct).name, at: q.at, amt: money(q.amt), label: st.label, glyph: st.glyph, fg: tn.fg, bg: tn.bg,
+        pending: PENDING(q.status), checking: s.checking === q.id, checkBtn: s.checking === q.id ? 'Checking…' : 'Check status', onCheck: () => this.checkStatus(q.id),
+        hasCheck: !!ck, cAt: ck && ck.at, cText: ck && ck.text, cBg: ck ? t[ck.tone + 'Bg'] : 'transparent' };
+    });
+    const sheetTitles = { xfer: x.phase === 'success' ? 'Transfer sent' : 'Review transfer', user: 'Who are you acting as?', open: 'Open an account', dev: 'Simulated provider' };
+    const userRows = s.users.map(u => { const sel = u.id === s.me, n = s.accounts.filter(a => a.user === u.id).length; return { name: u.name, initial: u.name[0].toUpperCase(), count: n + (n === 1 ? ' account' : ' accounts'), sel: sel ? 'true' : 'false', pick: () => this.switchUser(u.id), bd: sel ? t.accent : t.line, bg: sel ? t.accentSoft : 'transparent', dot: sel ? t.accent : t.lineStrong, dotFill: sel ? t.accent : 'transparent' }; });
+    const devDefs = [['approve', 'Approve', 'Provider charges and confirms.'], ['decline', 'Decline', 'Provider refuses; reserved money returns.'], ['lose', 'Charge, then lose the response', 'Charged, but no reply reaches us → Unconfirmed.'], ['timeout', 'Time out before charging', 'Nothing charged; stays unresolved while on.']];
+    const devModes = devDefs.map(([k, label, desc]) => { const sel = s.dev === k; return { label, desc, sel: sel ? 'true' : 'false', pick: () => this.setState({ dev: k }), bd: sel ? t.accent : t.line, bg: sel ? t.accentSoft : 'transparent', dot: sel ? t.accent : t.lineStrong, dotFill: sel ? t.accent : 'transparent' }; });
+    const titles = { accounts: isPhone ? 'Hi, ' + (me ? me.name : '') : 'Accounts', transfer: 'Transfer', pay: 'Pay for a room', activity: 'Activity' };
+    return {
+      isApp: !isKit, isKit, t, L, scheme: theme, ids, hatch, isPhone, isTablet, isDesktop, isWide: !isPhone, notDesktop: !isDesktop, nav, notice: NOTICE,
+      pageTitle: titles[s.tab], meName: me ? me.name : '', meInitial: me ? me.name[0].toUpperCase() : '', meAria: `Demo user: ${me ? me.name : ''}. Change who you're acting as.`,
+      openUser: () => this.setState({ sheet: 'user', newUserErr: '' }), openDev: () => this.setState({ sheet: 'dev' }),
+      openAcctSheet: () => this.setState({ sheet: 'open', newAcct: '', newAcctErr: '' }),
+      refreshErr: s.refreshErr, doRefresh: () => this.refresh(),
+      tabAccounts: s.tab === 'accounts', tabTransfer: s.tab === 'transfer', tabPay: s.tab === 'pay', tabActivity: s.tab === 'activity',
+      totAvail: totStr, totMain: totStr.slice(0, dot), totCents: totStr.slice(dot), totRes: money(totR),
+      barAvail: (totA / sum * 100) + '%', barRes: totR ? `max(8px, ${totR / sum * 100}%)` : '0px',
+      hasPending: minePending.length > 0, pendingTitle: minePending.length === 1 ? '1 payment not confirmed yet' : `${minePending.length} payments not confirmed yet`,
+      pendingAmt: money(minePending.reduce((n, q) => n + q.amt, 0)), goPayments: () => this.setState({ tab: 'activity', act: 'payments' }),
+      cards, fromOpts, toOpts: toList.map(a => ({ id: a.id, label: labelOf(s, a.id) })), toModes, xf, xs,
+      setXFrom: e => { const v = e.target.value; this.setState(st => { const nx = { ...st.x, from: v }; const tl = this.toOptions(st, nx); if (!tl.some(a => a.id === nx.to)) nx.to = tl[0] && tl[0].id; return { x: nx }; }); },
+      setXTo: e => this.setX({ to: e.target.value }), setXAmt: e => this.setX({ amount: e.target.value.replace(/[^\d.,]/g, '') }), touchX: () => { if (s.x.amount) this.setX({ touched: true }); },
+      xferSubmit: e => { e.preventDefault(); const r = parseAmount(s.x.amount); if (r.err || !toId) this.setX({ touched: true }); else this.setState(st => ({ sheet: 'xfer', x: { ...st.x, to: toId, phase: 'review', err: '' } })); },
+      xferSend: () => this.sendTransfer(), xferEdit: () => this.setState(st => ({ sheet: null, x: { ...st.x, phase: 'form' } })),
+      pf, hasPayRes: !!pr, pr: pr || {},
+      setPFrom: e => this.setP({ from: e.target.value, err: '' }), setPRef: e => this.setP({ ref: e.target.value }), setPAmt: e => this.setP({ amount: e.target.value.replace(/[^\d.,]/g, ''), err: '' }),
+      paySubmit: e => { e.preventDefault(); this.pay(); },
+      actTabs, actHistory: s.act === 'history', actTransfers: s.act === 'transfers', actPayments: s.act === 'payments',
+      histChips, histRows, histEmpty: histRows.length === 0, xferRows, xferEmpty: xferRows.length === 0, payRows, payEmpty: payRows.length === 0,
+      hasToast: !!s.toast, toast: s.toast,
+      sheetOpen: !!s.sheet, sheetTitle: sheetTitles[s.sheet] || '', closeSheet: () => this.closeSheet(),
+      shXfer: s.sheet === 'xfer', shUser: s.sheet === 'user', shOpen: s.sheet === 'open', shDev: s.sheet === 'dev',
+      userRows, newUser: s.newUser, setNewUser: e => this.setState({ newUser: e.target.value, newUserErr: '' }), addUser: e => { e.preventDefault(); this.addUser(); },
+      newUserHelp: s.newUserErr || 'Starts with one empty “Main” account.', newUserFg: s.newUserErr ? t.dangerFg : t.ink2, newUserW: s.newUserErr ? 600 : 400, newUserBd: s.newUserErr ? t.dangerFg : t.lineStrong,
+      newAcct: s.newAcct, setNewAcct: e => this.setState({ newAcct: e.target.value, newAcctErr: '' }), createAcct: e => { e.preventDefault(); this.createAcct(); },
+      newAcctHelp: s.newAcctErr || 'New accounts start at $0.00.', newAcctFg: s.newAcctErr ? t.dangerFg : t.ink2, newAcctW: s.newAcctErr ? 600 : 400, newAcctBd: s.newAcctErr ? t.dangerFg : t.lineStrong,
+      devModes, failRefresh: s.failRefresh ? 'true' : 'false', toggleFail: () => this.setState(st => ({ failRefresh: !st.failRefresh, refreshErr: !st.failRefresh })),
+      swBg: s.failRefresh ? t.accent : t.lineStrong, swX: s.failRefresh ? '21px' : '3px',
+      themeName: theme === 'dark' ? 'Dark' : 'Light',
+      swatches: ['bg', 'surface', 'surface2', 'line', 'ink', 'ink2', 'accent', 'accentSoft', 'successFg', 'warnFg', 'dangerFg', 'infoFg', 'successBg', 'warnBg', 'dangerBg', 'infoBg'].map(n => ({ n, v: t[n] })),
+      spaces: [4, 8, 12, 16, 20, 24, 32].map(n => ({ n, w: n * 3 + 'px' })), radii: [['8', '8px'], ['12', '12px'], ['16', '16px'], ['24', '24px'], ['pill', '999px']].map(([n, v]) => ({ n, v })),
+      badges: Object.values(STATUS).map(st => ({ ...st, ...tone(st.tone) }))
+    };
+  }
+  refresh() { if (this.state.failRefresh) { this.setState({ refreshErr: true }); this.showToast('Still offline — data unchanged'); } else { this.setState({ refreshErr: false }); this.showToast('Up to date'); } }
+  closeSheet() {
+    const s = this.state; if (s.x.phase === 'sending') return;
+    if (s.sheet === 'xfer') this.setState(st => ({ sheet: null, x: st.x.phase === 'success' ? { ...st.x, amount: '', touched: false, phase: 'form', done: null } : { ...st.x, phase: 'form' } }));
+    else this.setState({ sheet: null });
+  }
+  sendTransfer() {
+    const s = this.state, r = parseAmount(s.x.amount); if (!r.c || s.x.phase === 'sending') return;
+    this.setX({ phase: 'sending', err: '' });
+    this.later(() => this.setState(st => {
+      const from = st.accounts.find(a => a.id === st.x.from), to = st.x.to;
+      if (r.c > from.avail) return { x: { ...st.x, phase: 'error', err: NOFUNDS } };
+      return { ...transferApply(st, from.id, to, r.c), x: { ...st.x, phase: 'success', done: { c: r.c, from: from.id, to } } };
+    }), 900);
+  }
+  pay() {
+    const s = this.state, p = s.p; if (p.sending) return;
+    const r = parseAmount(p.amount), ref = p.ref.trim();
+    if (r.err || !ref) { this.setP({ touched: true }); return; }
+    const from = s.accounts.find(a => a.id === p.from);
+    const dup = s.payments.find(q => q.acct === p.from && q.amt === r.c && PENDING(q.status) && q.ref.toLowerCase() === ref.toLowerCase());
+    if (dup) { this.setP({ last: dup.id, dup: true, err: '' }); this.checkStatus(dup.id); return; }
+    if (r.c > from.avail) { this.setP({ err: NOFUNDS }); return; }
+    this.setP({ sending: true, err: '', dup: false });
+    this.later(() => this.setState(st => {
+      const res = payApply(st, p.from, r.c, ref, st.dev);
+      const status = res.s.payments[0].status;
+      const clear = status === 'paid';
+      return { ...res.s, p: { ...st.p, sending: false, last: res.id, touched: false, amount: clear ? '' : st.p.amount, ref: clear ? '' : st.p.ref } };
+    }), 1100);
+  }
+  checkStatus(pid) {
+    if (this.state.checking) return;
+    this.setState({ checking: pid });
+    this.later(() => this.setState(st => ({ ...checkApply(st, pid, st.dev), checking: null })), 800);
+  }
+  switchUser(id) {
+    this.setState(st => {
+      const mine = st.accounts.filter(a => a.user === id), f = mine[0] && mine[0].id;
+      return { me: id, sheet: null, histAcct: f, x: { from: f, mode: mine.length > 1 ? 'mine' : 'people', to: mine[1] ? mine[1].id : undefined, amount: '', touched: false, phase: 'form', err: '', done: null }, p: { from: f, amount: '', ref: '', touched: false, sending: false, err: '', last: null, dup: false } };
+    });
+    const u = this.state.users.find(u => u.id === id); this.showToast('Now acting as ' + u.name);
+  }
+  addUser() {
+    const name = this.state.newUser.trim();
+    if (!name) return this.setState({ newUserErr: 'Enter a name.' });
+    if (this.state.users.some(u => u.name.toLowerCase() === name.toLowerCase())) return this.setState({ newUserErr: 'That name is already taken.' });
+    const id = 'u' + rid();
+    this.setState(st => ({ users: [...st.users, { id, name }], accounts: [...st.accounts, { id: 'x' + rid(), user: id, name: 'Main', avail: 0, res: 0 }], newUser: '' }), () => this.switchUser(id));
+  }
+  createAcct() {
+    const name = this.state.newAcct.trim(), s = this.state;
+    if (!name) return this.setState({ newAcctErr: 'Enter an account name.' });
+    if (name.length > 30) return this.setState({ newAcctErr: 'Keep it under 30 characters.' });
+    if (s.accounts.some(a => a.user === s.me && a.name.toLowerCase() === name.toLowerCase())) return this.setState({ newAcctErr: `You already have an account called “${name}”.` });
+    this.setState(st => ({ accounts: [...st.accounts, { id: 'x' + rid(), user: st.me, name, avail: 0, res: 0 }], sheet: null, newAcct: '' }));
+    this.showToast(`Opened “${name}”`);
+  }
+}
+</script>
+</body>
+</html>

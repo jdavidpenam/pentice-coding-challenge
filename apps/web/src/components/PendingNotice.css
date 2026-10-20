@@ -1,0 +1,5 @@
+.pending { display: flex; align-items: center; gap: var(--space-3); background: var(--warning-bg); border-radius: 18px; padding: 14px 16px; }
+.pending__glyph { flex: none; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--warning-fg); color: var(--warning-fg); display: grid; place-items: center; font-weight: 800; }
+.pending__text { flex: 1; display: grid; font-size: 14px; min-width: 0; }
+.pending__text span { color: var(--ink-2); font-size: var(--fs-meta); }
+.pending .btn { background: transparent; }

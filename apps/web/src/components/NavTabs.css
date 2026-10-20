@@ -1,0 +1,26 @@
+/* Phone: bottom tab bar */
+.nav { display: flex; background: var(--surface); border-top: 1px solid var(--line); padding: 4px 8px calc(4px + env(safe-area-inset-bottom)); }
+.nav__item { flex: 1; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; background: transparent; color: var(--ink-2); font-size: var(--fs-micro); font-weight: 600; border-radius: var(--radius-md); }
+.nav__item--on { color: var(--accent-ink); }
+.nav__pill { width: 44px; height: 28px; border-radius: var(--radius-pill); display: grid; place-items: center; }
+.nav__item--on .nav__pill { background: var(--accent-soft); }
+.nav__icon { display: block; width: 13px; height: 13px; border: 2px solid currentColor; }
+.nav__icon--rounded { border-radius: 4px; }
+.nav__icon--circle { border-radius: 50%; }
+.nav__icon--diamond { width: 11px; height: 11px; transform: rotate(45deg); border-radius: 2px; }
+.nav__icon--square { border-radius: 1px; }
+
+/* Tablet: segmented control under the header */
+@media (min-width: 700px) {
+  .nav { width: calc(100% - 56px); max-width: 680px; margin: 0 auto 12px; background: var(--surface-2); border: none; border-radius: var(--radius-lg); padding: 4px; gap: 4px; }
+  .nav__item { flex-direction: row; min-height: var(--touch); gap: 8px; font-size: var(--fs-label); border-radius: var(--radius-md); }
+  .nav__pill { width: auto; height: auto; background: none !important; }
+  .nav__item--on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+}
+
+/* Desktop: vertical list in the sidebar */
+@media (min-width: 1100px) {
+  .nav { flex-direction: column; width: 100%; max-width: none; margin: 0; background: transparent; padding: 0; }
+  .nav__item { justify-content: flex-start; min-height: 48px; border-radius: var(--radius-lg); padding: 0 12px; font-size: var(--fs-body); }
+  .nav__item--on { background: var(--accent-soft); color: var(--accent-ink); box-shadow: none; }
+}

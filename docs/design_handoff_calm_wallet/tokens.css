@@ -1,0 +1,95 @@
+/* Calm wallet — design tokens. Import once at app root.
+   Theme: <html data-theme="light|dark">; falls back to OS preference. */
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap');
+
+:root, [data-theme="light"] {
+  color-scheme: light;
+  --bg: oklch(0.972 0.006 155);
+  --surface: oklch(0.998 0.002 155);
+  --surface-2: oklch(0.945 0.008 155);
+  --field: oklch(0.998 0.002 155);
+  --line: oklch(0.9 0.008 155);
+  --line-strong: oklch(0.72 0.012 155);
+  --ink: oklch(0.23 0.02 165);
+  --ink-2: oklch(0.46 0.015 165);
+  --accent: oklch(0.44 0.085 168);
+  --on-accent: oklch(0.99 0.005 165);
+  --accent-soft: oklch(0.92 0.035 168);
+  --accent-ink: oklch(0.38 0.075 168);
+  --ring: oklch(0.44 0.085 168 / .35);
+  --success-fg: oklch(0.44 0.1 150);   --success-bg: oklch(0.94 0.045 150);
+  --warning-fg: oklch(0.47 0.1 65);    --warning-bg: oklch(0.95 0.05 85);
+  --danger-fg:  oklch(0.49 0.16 27);   --danger-bg:  oklch(0.95 0.03 27);
+  --info-fg:    oklch(0.46 0.11 250);  --info-bg:    oklch(0.95 0.03 250);
+  --disabled-bg: oklch(0.9 0.006 155);
+  --disabled-fg: oklch(0.48 0.01 155);
+  --scrim: oklch(0.2 0.02 165 / .45);
+  --toast-bg: oklch(0.25 0.02 165);
+  --toast-fg: oklch(0.97 0.005 155);
+  --shadow-card: 0 1px 2px oklch(0.3 0.02 165 / .06), 0 8px 24px oklch(0.3 0.02 165 / .06);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: oklch(0.17 0.012 165);
+  --surface: oklch(0.215 0.014 165);
+  --surface-2: oklch(0.26 0.014 165);
+  --field: oklch(0.19 0.012 165);
+  --line: oklch(0.31 0.014 165);
+  --line-strong: oklch(0.5 0.015 165);
+  --ink: oklch(0.95 0.008 155);
+  --ink-2: oklch(0.76 0.012 155);
+  --accent: oklch(0.8 0.11 168);
+  --on-accent: oklch(0.2 0.03 168);
+  --accent-soft: oklch(0.32 0.045 168);
+  --accent-ink: oklch(0.86 0.09 168);
+  --ring: oklch(0.8 0.11 168 / .4);
+  --success-fg: oklch(0.82 0.13 150);  --success-bg: oklch(0.3 0.05 150);
+  --warning-fg: oklch(0.84 0.12 80);   --warning-bg: oklch(0.31 0.05 70);
+  --danger-fg:  oklch(0.79 0.13 27);   --danger-bg:  oklch(0.32 0.07 27);
+  --info-fg:    oklch(0.81 0.1 250);   --info-bg:    oklch(0.3 0.05 250);
+  --disabled-bg: oklch(0.3 0.01 165);
+  --disabled-fg: oklch(0.7 0.01 165);
+  --scrim: oklch(0.05 0.01 165 / .6);
+  --toast-bg: oklch(0.93 0.01 155);
+  --toast-fg: oklch(0.2 0.02 165);
+  --shadow-card: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { /* mirror [data-theme="dark"] — copy values or set data-theme from JS */ }
+}
+
+:root {
+  /* Reserved money pattern — ALWAYS paired with the word "Reserved" */
+  --hatch-reserved: repeating-linear-gradient(135deg, var(--warning-fg) 0 2px, transparent 2px 5px);
+
+  --font: Figtree, system-ui, -apple-system, sans-serif;
+  /* type scale: size / line-height / weight */
+  --fs-display: 44px;   /* total available, phone (56px ≥700px); cents at 28px (34px) in --ink-2 */
+  --fs-amount: 28px;    /* account card balance, amount input */
+  --fs-title: 24px;     /* page title phone (28px ≥700px) */
+  --fs-sheet: 20px;     /* sheet/dialog title */
+  --fs-section: 17px;
+  --fs-body: 15px;      /* line-height 1.45 */
+  --fs-label: 14px;     /* labels 700, buttons 600–700 */
+  --fs-meta: 13px;      /* helper text, meta; never below 12px */
+  --fs-micro: 12px;     /* tab labels, table headers */
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+
+  --radius-sm: 8px; --radius-md: 12px; --radius-field: 14px; --radius-lg: 16px;
+  --radius-card: 20px; --radius-xl: 24px; --radius-pill: 999px;
+
+  --touch: 44px;        /* minimum target */
+  --field-h: 52px;      /* selects, text inputs */
+  --amount-h: 64px;     /* amount input */
+  --btn-h: 54px;        /* primary button */
+
+  --bp-tablet: 700px;   /* reference only: use in @media */
+  --bp-desktop: 1100px;
+}
+
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 var(--fs-body)/1.45 var(--font); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent-ink); }
+a:hover { color: var(--ink); }
+:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }

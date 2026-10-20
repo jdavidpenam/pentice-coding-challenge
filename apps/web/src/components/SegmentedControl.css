@@ -1,0 +1,3 @@
+.seg { display: flex; background: var(--surface-2); border-radius: var(--radius-lg); padding: 4px; gap: 4px; }
+.seg__item { flex: 1; min-height: var(--touch); border-radius: var(--radius-md); border: none; background: transparent; color: var(--ink-2); font-weight: 600; font-size: var(--fs-label); }
+.seg__item--on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }

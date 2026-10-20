@@ -1,0 +1,14 @@
+.sheet { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+.sheet__scrim { position: absolute; inset: 0; background: var(--scrim); }
+.sheet__panel { position: relative; width: 100%; max-height: 92dvh; overflow-y: auto; background: var(--surface); border-radius: var(--radius-xl) var(--radius-xl) 0 0; padding: var(--space-2) var(--space-5) var(--space-6); }
+.sheet__handle { width: 40px; height: 5px; border-radius: var(--radius-pill); background: var(--line-strong); margin: 4px auto 8px; }
+.sheet__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.sheet__title { font-size: var(--fs-sheet); font-weight: 700; }
+.sheet__close { min-width: var(--touch); min-height: var(--touch); border-radius: 50%; border: none; background: var(--surface-2); color: var(--ink); font-size: 16px; }
+.sheet__close:disabled { opacity: .5; cursor: not-allowed; }
+.sheet__body { display: grid; gap: var(--space-4); }
+@media (min-width: 700px) {
+  .sheet { align-items: center; }
+  .sheet__panel { width: 440px; border-radius: var(--radius-xl); padding: var(--space-5) var(--space-6) var(--space-6); }
+  .sheet__handle { display: none; }
+}

@@ -1,0 +1,11 @@
+.field { display: grid; gap: var(--space-2); }
+.field__label { font-size: var(--fs-label); font-weight: 700; }
+.field__msg { font-size: var(--fs-meta); color: var(--ink-2); display: flex; gap: 6px; align-items: flex-start; min-height: 1em; }
+.field__msg--warning { color: var(--warning-fg); font-weight: 600; }
+.field__msg--error { color: var(--danger-fg); font-weight: 600; }
+.field__err-glyph { flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--danger-fg); color: var(--surface); display: grid; place-items: center; font-size: 11px; font-weight: 800; margin-top: 1px; }
+.input, .select { width: 100%; min-height: var(--field-h); border-radius: var(--radius-field); border: 1.5px solid var(--line-strong); background: var(--field); padding: 0 var(--space-4); font-size: var(--fs-body); }
+.input[aria-invalid='true'], .select[aria-invalid='true'] { border-color: var(--danger-fg); }
+.select-wrap { position: relative; }
+.select { appearance: none; padding-right: 44px; }
+.select-wrap::after { content: '▼'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--ink-2); pointer-events: none; }

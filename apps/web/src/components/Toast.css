@@ -1,0 +1,3 @@
+.toast-region { position: fixed; left: 0; right: 0; bottom: 96px; display: flex; justify-content: center; pointer-events: none; z-index: 60; }
+.toast { background: var(--toast-bg); color: var(--toast-fg); border-radius: var(--radius-field); padding: 12px 18px; font-size: 14px; font-weight: 600; max-width: calc(100% - 32px); }
+@media (min-width: 700px) { .toast-region { bottom: 32px; } }
